@@ -1,0 +1,7 @@
+build/
+*.sym
+__pycache__/
+assets/sids/*
+assets/fonts/*
+!assets/sids/.gitkeep
+!assets/fonts/.gitkeep
