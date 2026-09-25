@@ -179,3 +179,10 @@ tools/                  build_disk.py + unit tests
 tests/e2e/              VICE end-to-end tests
 .claude/skills/         task guides for coding agents
 ```
+
+## License
+
+[0BSD](LICENSE) (BSD Zero Clause): use, copy, modify and distribute this
+software – including the intros you make with it – for any purpose, with or
+without fee, without any conditions. This covers the code and the own test
+tune; third-party music and fonts you put on a disk keep their own licenses.
