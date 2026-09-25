@@ -33,11 +33,12 @@ stub_end:
 #import "runtime/colorcycle.asm"
 #import "runtime/ramtables.asm"
 #import "runtime/titleinit.asm"
+#import "runtime/starplot.asm"
 #import "runtime/tables.asm"
 .errorif * > RT_CODE_END, "runtime code overflow, ends at $" + toHexString(*)
 
-* = SPRITE_DATA "sprite ball"
-        SpriteBall()
+* = SPRITE_DATA "star frame"        // drawn at start (stars.asm)
+        .fill 64, 0
 .errorif * > SPRITE_DATA + 64, "sprite data overflow"
 
 * = RT_TABLES
@@ -45,6 +46,7 @@ stub_end:
 * = RT_CODE2 "runtime 2"
 #import "runtime/title.asm"
 #import "runtime/linkstart.asm"
+#import "runtime/stars.asm"
 .errorif * > RT_CODE2_END, "runtime code 2 overflow, ends at $" + toHexString(*)
 
 #if FIXTURE

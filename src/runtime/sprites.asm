@@ -1,6 +1,7 @@
 #importonce
 // ---------------------------------------------------------------------------
-// sprites.asm - 8 hires balls on a sine path (sprite zone, lines 76-125).
+// sprites.asm - 8 twinkling stars on a sine path (sprite zone, lines
+// 76-125). Star frames: stars.asm.
 // ---------------------------------------------------------------------------
 
 spr_init:
@@ -13,9 +14,7 @@ spr_init:
         sta rt_spr_px
         sta rt_spr_py
         ldx #SPR_COUNT - 1
-!:      lda #SPRITE_PTR
-        sta SPRITE_PTRS,x
-        lda rt_spr_colors,x
+!:      lda rt_spr_colors,x
         sta VIC_SPR0_COL,x
         dex
         bpl !-
@@ -27,7 +26,7 @@ spr_init:
         sta VIC_SPR_ENABLE
 !:      rts
 
-// called in IRQ TOP; ~8 x 40 = 320 cycles
+// called in IRQ TOP; ~8 x 40 + 8 x 22 = 500 cycles
 spr_update:
         lda cfg_flags
         and #FLAG_SPRITES
@@ -74,5 +73,27 @@ su_loop:
         adc #SPR_Y_SPEED
         and #SIN_LEN - 1
         sta rt_spr_py
+        // star size: ping-pong over the frames, phase offset per sprite
+        inc rt_star_count
+        lda rt_star_count
+        .for (var i = 0; i < STAR_STEP_SHIFT; i++) {
+            lsr
+        }
+        sta rt_t0
+        ldx #SPR_COUNT - 1
+!:      txa
+        clc
+        adc rt_t0
+        and #STAR_PINGPONG - 1
+        tay
+        lda star_pingpong,y
+        sta SPRITE_PTRS,x
+        dex
+        bpl !-
 su_done:
         rts
+
+star_pingpong:
+        .byte STAR_TAPE / 64, STAR_TAPE / 64 + 1, STAR_TAPE / 64 + 2, SPRITE_PTR
+        .byte SPRITE_PTR, STAR_TAPE / 64 + 2, STAR_TAPE / 64 + 1, STAR_TAPE / 64
+.errorif * - star_pingpong != STAR_PINGPONG, "ping-pong table"

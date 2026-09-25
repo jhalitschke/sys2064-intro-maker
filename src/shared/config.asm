@@ -134,6 +134,8 @@
 .const CTRL_SPEED2       = $f2
 .const CTRL_SPEED4       = $f4
 .const CTRL_PAUSE        = $f8
+.const CTRL_SPEED_MASK   = $07      // speed = code & 7
+.errorif (CTRL_SPEED1 & CTRL_SPEED_MASK) != 1 || (CTRL_SPEED2 & CTRL_SPEED_MASK) != 2 || (CTRL_SPEED4 & CTRL_SPEED_MASK) != 4, "speed codes"
 .const TEXT_END_MARK     = $ff
 .const PAUSE_FRAMES      = 100
 .const SC_SPACE          = $20
@@ -155,6 +157,10 @@
 .const CYC_DIVIDER       = 2        // frames per phase step
 .const SPR_COUNT         = 8
 .const SPR_PHASE_STEP    = 16
+.const STAR_FRAMES       = 4        // sizes: tape buffer blocks + SPRITE_DATA
+.const STAR_STEP_SHIFT   = 2        // 2^n frames per animation step
+.const STAR_CENTER       = 10       // of the 21 x 21 area
+.const STAR_PINGPONG     = 8        // 0 1 2 3 3 2 1 0
 .const SPR_X2_MID        = (SPR_X_MIN + SPR_X_MAX) / 4   // x / 2 tables
 .const SPR_X2_AMP        = (SPR_X_MAX - SPR_X_MIN) / 4
 .const SPR_Y_MID         = (SPR_Y_MIN + SPR_Y_MAX) / 2

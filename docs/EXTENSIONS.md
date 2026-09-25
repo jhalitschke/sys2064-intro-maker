@@ -148,7 +148,9 @@ program instead of resetting the machine.
 | `$9A00-$9BFF` | editor variables (were `$6800`) |
 | `$9C00-$9FFF` | editor: Scale2x bit spreading tables |
 | `$E000-$E47F` | runtime: bar buffers, FLD table, sprite/bar sines, title image, bar presets, saved BASIC zero page (RAM under the KERNAL, built at start, not saved) |
-| `$033C-$03EB` | linked program: mover, at exit only |
+| `$0340-$03FF` | runtime: 3 star sprite frames (tape buffer, drawn at start) |
+| `$0FC0-$0FFF` | runtime: biggest star frame (drawn at start) |
+| `$033C-$03EB` | linked program: mover, at exit only (after the sprites are off) |
 
 Config block v2 (additions, offsets from `$2800`): `+$60` W, `+$61` H,
 `+$62` multicolour, `+$63/$64` MC colours, `+$65` movement, `+$66` movement
@@ -159,7 +161,16 @@ map (64 bytes).
 Catalog v2: header `n_sids, n_fonts, n_bigfonts, 0`, records from `+4`
 (max. 15 tunes, 15 fonts, 12 big fonts).
 
-## 6. Main menu
+## 6. Twinkling stars
+
+The SPRITES effect shows 8 stars instead of balls. `stars_init` draws 4
+frames at start (arm lengths 1, 3, 6, 10 plus half-length diagonals, plotted
+in 4 rotations): 3 in the tape buffer, the biggest at `$0FC0`. IRQ TOP plays
+them ping-pong (0 1 2 3 3 2 1 0), one step every 4 frames, with a phase
+offset of one step per sprite. Movement, colours, flag and editor entry are
+unchanged.
+
+## 7. Main menu
 
 ```
 1 MUSIC  2 FONT  3 COLORS  4 EFFECTS  5 TITLE  6 TITLE STYLE

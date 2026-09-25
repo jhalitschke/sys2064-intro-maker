@@ -83,8 +83,12 @@
 .const BASIC_SYS_ADDR    = ENTRY_JMP
 .label RT_CODE           = $0813
 .label RT_CODE_END       = $0fc0    // exclusive
-.label SPRITE_DATA       = $0fc0
+.label SPRITE_DATA       = $0fc0    // biggest star frame (built at start)
 .const SPRITE_PTR        = SPRITE_DATA / 64
+.label STAR_TAPE         = $0340    // 3 smaller star frames in the tape buffer
+.const STAR_TAPE_BLOCKS  = 3        // (unused while the runtime runs)
+.errorif (STAR_TAPE & 63) != 0, "star frames must be sprite block aligned"
+.errorif STAR_TAPE + STAR_TAPE_BLOCKS * 64 > SCREEN, "star frames reach the screen"
 .label SID_START         = $1000
 .label SID_END           = $2000    // exclusive, max 4 KB
 .label FONT              = $2000
@@ -116,7 +120,8 @@
 .label rt_next_d011      = RT_WORK + $4c
 .label rt_next_d016      = RT_WORK + $4d
 .label rt_wchars         = RT_WORK + $4e   // title width in chars
-.label RT_WORK_END       = RT_WORK + $4f
+.label rt_star_count     = RT_WORK + $4f   // star animation frame counter
+.label RT_WORK_END       = RT_WORK + $50
 .errorif rt_frame < rt_cyc_ext + CYC_EXT_LEN, "runtime work area overlap"
 .errorif RT_WORK_END > CONFIG_END, "runtime work area overflow"
 .label RT_TABLES         = $2900
@@ -195,9 +200,9 @@
 // segment. The other tables and the bar buffers live in RAM under the KERNAL
 // (not saved, unused by the editor and by linked programs) and are built by
 // runtime_start.
-.label mv_sin            = RT_TABLES                // signed sine, +-127
-.const SIN_LEN           = 128
-.label RT_CODE2          = RT_TABLES + SIN_LEN
+.label mv_sin            = RT_TABLES                // |sine| 0..127, half wave
+.const SIN_LEN           = 128                      // phases per period
+.label RT_CODE2          = RT_TABLES + SIN_LEN / 2
 .label RT_CODE2_END      = RT_TABLES_END
 .label RT_RAM            = $e000
 .label border_buf        = RT_RAM + $00

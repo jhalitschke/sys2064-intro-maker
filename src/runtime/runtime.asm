@@ -43,6 +43,7 @@ runtime_start:
         sta VIC_RASTER
         jsr rt_tables_init          // needs $01 = $35 (RAM under KERNAL)
         jsr rt_screen_init
+        jsr stars_init
         jsr spr_init
         jsr scroll_init
         jsr cyc_init

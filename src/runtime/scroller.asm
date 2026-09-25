@@ -70,19 +70,9 @@ sf_next:
         lda #PAUSE_FRAMES
         sta rt_pause
         jmp sf_next
-!:      cmp #CTRL_SPEED1
-        bne !+
-        lda #1
-        sta rt_speed
-        jmp sf_next
-!:      cmp #CTRL_SPEED2
-        bne !+
-        lda #2
-        sta rt_speed
-        jmp sf_next
-!:      cmp #CTRL_SPEED4
-        bne sf_next                 // unknown code: skip
-        lda #4
+!:      cmp #CTRL_SPEED4 + 1       // $f1/$f2/$f4: speed in the low bits
+        bcs sf_next                 // unknown code: skip
+        and #CTRL_SPEED_MASK
         sta rt_speed
         jmp sf_next
 sf_space:

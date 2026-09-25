@@ -6,8 +6,8 @@
 
 // Saved table: import with * = RT_TABLES
 .macro RuntimeTables() {
-    * = mv_sin "movement sine"
-        .fill SIN_LEN, round(127 * sin(toRadians(i * 360 / SIN_LEN))) & $ff
+    * = mv_sin "movement sine"      // first half wave, >= 0
+        .fill SIN_LEN / 2, round(127 * sin(toRadians(i * 360 / SIN_LEN)))
 }
 
 // Small tables: emitted where this file is imported (runtime segment)
@@ -34,20 +34,3 @@ rt_cyc_tab:
         .byte 9, 2, 8,10,15, 7, 1, 1, 1, 7,15,10, 8, 2, 9, 9
 rt_spr_colors:
         .byte 1, 7, 3, 5,13,14,10,15
-
-// 21x21 ball, generated
-.macro SpriteBall() {
-    .for (var y = 0; y < 21; y++) {
-        .for (var b = 0; b < 3; b++) {
-            .var v = 0
-            .for (var bit = 0; bit < 8; bit++) {
-                .var x = b * 8 + bit
-                .var dx = x - 10
-                .var dy = y - 10
-                .if (x < 21 && dx * dx + dy * dy <= 110) .eval v = v | ($80 >> bit)
-            }
-            .byte v
-        }
-    }
-    .byte 0
-}

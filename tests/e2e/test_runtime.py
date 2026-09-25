@@ -130,6 +130,34 @@ class TitleMovementTests(unittest.TestCase):
                         v.quit()
 
 
+@need_headless
+class StarTests(unittest.TestCase):
+    """Sprites are twinkling stars: 4 frames (tape buffer + $0fc0), played
+    ping-pong with a phase offset per sprite."""
+    FRAMES = {0x0D, 0x0E, 0x0F, 0x3F}
+
+    def test_pointers_cycle_through_all_frames(self):
+        make("fixture")
+        v = Vice(["-autostartprgmode", "1", "-autostart", str(BUILD / "fixture.prg")])
+        try:
+            v.wait_until(lambda: v.peek(0x01)[0] == 0x35, timeout=30)
+            seen, offsets = set(), False
+            for _ in range(12):
+                ptrs = v.peek(0x07F8, 8)
+                self.assertTrue(set(ptrs) <= self.FRAMES, f"pointers {ptrs}")
+                seen |= set(ptrs)
+                offsets |= len(set(ptrs)) > 1
+                time.sleep(0.15)
+            self.assertEqual(seen, self.FRAMES)
+            self.assertTrue(offsets, "all stars twinkle in sync")
+            big = v.peek(0x0FC0, 63)
+            small = v.peek(0x0340, 63)
+            self.assertGreater(sum(bin(b).count("1") for b in big),
+                               sum(bin(b).count("1") for b in small))
+        finally:
+            v.quit()
+
+
 @need_display
 class RuntimeInteractiveTests(unittest.TestCase):
     @classmethod

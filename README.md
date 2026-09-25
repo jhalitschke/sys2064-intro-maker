@@ -21,7 +21,7 @@ in RAM (`$0801` up to the end of the scroll text), so "save" is one KERNAL
   catalog or from any disk.
 - **Colours**: border, background, scroller and title colour.
 - **Effects** (each on/off): 3 raster bars in an FLD gap with 8 colour presets,
-  bar sine movement, 8 sprite balls on a sine path, title colour cycle,
+  bar sine movement, 8 twinkling star sprites on a sine path, title colour cycle,
   scroll speed 1/2/4.
 - **Title**: 2 × 40 characters in the scroll font, or in a **big font**
   (1–4 × 1–4 characters per glyph, hires or multicolour, built-in smoothed

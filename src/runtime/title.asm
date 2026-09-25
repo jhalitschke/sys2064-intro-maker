@@ -209,13 +209,14 @@ tu_y_sine:
 tu_sin_abs:
         and #SIN_LEN - 1
         tax
-        lda mv_sin,x
+        and #SIN_LEN / 2            // second half wave: negative
+        asl
         sta rt_t3
-        bpl !+
-        eor #$ff
-        clc
-        adc #1
-!:      rts
+        txa
+        and #SIN_LEN / 2 - 1
+        tax
+        lda mv_sin,x
+        rts
 
 // A (0..127) * X (0..255) / 128 -> A   (shift-add, ~150 cycles)
 tu_mul:
