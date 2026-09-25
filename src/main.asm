@@ -44,6 +44,7 @@ stub_end:
         RuntimeTables()
 * = RT_CODE2 "runtime 2"
 #import "runtime/title.asm"
+#import "runtime/linkstart.asm"
 .errorif * > RT_CODE2_END, "runtime code 2 overflow, ends at $" + toHexString(*)
 
 #if FIXTURE

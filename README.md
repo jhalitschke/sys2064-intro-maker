@@ -29,7 +29,9 @@ in RAM (`$0801` up to the end of the scroll text), so "save" is one KERNAL
   **bumper**, with 4 speeds.
 - **Scroll text**: up to 5118 characters with inline speed changes and pauses.
 - **Preview** as often as you like, then **save** – the saved file starts
-  with `LOAD"NAME",8` and `RUN`; SPACE resets the machine.
+  with `LOAD"NAME",8` and `RUN`; SPACE resets the machine, or starts a
+  **linked program**: the intro can be put in front of any PRG from disk
+  (BASIC or machine code, up to 36 KB), which runs after SPACE.
 - Stable raster (double IRQ, exactly 63 cycles per line), PAL only.
 
 ## Quick start
@@ -52,7 +54,7 @@ Main menu – press the number key:
 | `5` | **TITLE** | overwrite mode, 80 chars in 2 rows, CRSR keys, DEL, HOME, RUN/STOP back |
 | `6` | **TITLE STYLE** | `1` big font list (NONE, ROM 2X2, catalog, FROM DISK), `2` movement, `3` movement speed, `4`/`5` multicolour colours |
 | `7` | **SCROLLTEXT** | insert mode, CRSR keys (±1 / ±40), DEL, HOME, RUN/STOP back |
-| `8` | **LINK PROGRAM** | see below |
+| `8` | **LINK PROGRAM** | `1` pick a PRG from disk, `2` start with RUN / SYS, `3` SYS address (hex), `4` remove |
 | `9` | **PREVIEW** | SPACE returns to the editor |
 | `0` | **SAVE** | type a file name (1–16 chars), RETURN saves, RUN/STOP cancels |
 
@@ -62,6 +64,14 @@ to the disk as they are) or PRG files loading at `$1000` (init `$1000`, play
 `$1003`); RSID, CIA-timed and wrongly linked tunes are rejected with a message
 and the previous tune keeps playing. Fonts are PRG files with a load address
 followed by at least 512 bytes (e.g. `.64c`).
+
+**Linking a program:** the program must be on the disk you save the intro
+to. The editor measures it (this reads the whole file once), and saving
+writes intro + program as one file (reads and writes it once more – a 30 KB
+program takes a few minutes with the standard 1541 routines). BASIC
+programs at `$0801` start with RUN, everything else with SYS at its load
+address unless you enter another one. Details:
+[docs/EXTENSIONS.md](docs/EXTENSIONS.md).
 
 **Big title fonts:** a big title line holds 40 / W glyphs (20 for 2x2).
 Big titles are centred; a static 1x1 title stays exactly as typed. Glyphs a
@@ -178,13 +188,15 @@ the end-to-end tests need the VICE ROMs and run locally.
 ## How it works
 
 ```
-$0801  BASIC stub "10 SYS2064"      $2000  font (chars $00-$3F)
-$0810  JMP editor_start / runtime   $2800  config block
-$0813  runtime code                 $2900  runtime tables, bar buffers
+$0801  BASIC stub "10 SYS2064"      $2000  font, big font tiles $2200
+$0810  JMP editor_start / runtime   $2800  config block, runtime work
+$0813  runtime code                 $2900  sine table, runtime code 2
 $0FC0  sprite                       $2C00  scroll text ... $FF
 $1000  SID (max. 4 KB)              $3FFF  $00 (VIC idle byte)
 ------------------------------------------------ saved intro ends here
-$4000  editor   $6000  catalog   $6800  editor variables
+                                    (linked: mover $4000, program $40B0)
+$4000  editor   $6800  catalog   $7000  file buffer   $9A00  editor vars
+$E000  runtime tables in RAM under the KERNAL (built at start)
 ```
 
 The runtime uses five raster IRQs per frame: TOP (title fine scroll,

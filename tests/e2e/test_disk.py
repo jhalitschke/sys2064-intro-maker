@@ -4,8 +4,9 @@ import subprocess
 import time
 import unittest
 
-from helpers import (OUT, at_menu, build_test_disk, cleanup, dir_index, make,
-                     need_display, select_entry, start_editor, status_line, wait_menu)
+from helpers import (OUT, at_menu, build_test_disk, cleanup, dir_index, linked_programs,
+                     make, need_display, select_entry, start_editor, status_line,
+                     wait_menu)
 from vice import BUILD, Vice, symbols
 
 CONFIG, FONT, TEXT = 0x2800, 0x2000, 0x2C00
@@ -100,7 +101,7 @@ class DiskTests(unittest.TestCase):
 
     def test_07_load_error(self):
         v = self.v
-        v.poke(0x6004 + 21, 0x58, 0x58)    # break the name of catalog record 0
+        v.poke(0x6804 + 21, 0x58, 0x58)    # break the name of catalog record 0
         v.key("1")
         select_entry(v, 1)
         v.key("Return")
@@ -277,3 +278,98 @@ class CatalogMissingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@need_display
+class LinkTests(unittest.TestCase):
+    """Intro linked in front of a program: RUN (BASIC) and SYS (ML), forward
+    and overlapping backward moves."""
+    CASES = {"link-basic": ("LKBASIC", 5), "link-ml5000": ("LKML5000", 7),
+             "link-mlc000": ("LKMLC000", 2)}
+
+    @classmethod
+    def setUpClass(cls):
+        make("disk")
+        cls.d64, cls.tmp = build_test_disk()
+        cls.programs = linked_programs()
+
+    @classmethod
+    def tearDownClass(cls):
+        cleanup(cls.tmp)
+
+    def link(self, v, name):
+        v.key("8")
+        v.key("1")
+        self.assertTrue(v.wait_until(
+            lambda: v.screen_text(24)[23].startswith("CRSR SELECT"), timeout=60))
+        select_entry(v, dir_index(self.d64, name))
+        v.key("Return")
+        self.assertTrue(v.wait_until(
+            lambda: v.screen_text(1)[0] == "LINK PROGRAM"
+            and "MEASURING" not in v.screen_text(25)[24], timeout=120))
+
+    def test_01_link_screen(self):
+        v = start_editor(self.d64)
+        try:
+            self.link(v, "link-basic")
+            lines = v.screen_text(10)
+            self.assertEqual(lines[2], "1 PROGRAM       LINK-BASIC")
+            self.assertEqual(lines[3], "2 START         RUN")
+            length = len(self.programs["link-basic"]) - 2
+            self.assertEqual(lines[7], f"LOADS TO $0801-${0x0801 + length - 1:04X}")
+            v.key("2")
+            self.assertEqual(v.screen_text(4)[3], "2 START         SYS $0801")
+            v.key("3")
+            v.type("C0A")
+            v.key("BackSpace")
+            v.type("12")
+            v.key("Return")
+            self.assertEqual(v.screen_text(4)[3], "2 START         SYS $C012")
+            self.assertEqual(v.peek(CONFIG + 0x6C, 2), [0x12, 0xC0])
+            v.key("2")
+            self.assertEqual(v.screen_text(4)[3], "2 START         RUN")
+            v.key("4")
+            self.assertEqual(v.screen_text(3)[2], "1 PROGRAM       NONE")
+            self.assertEqual(v.peek(CONFIG + 0x68, 2), [0, 0])
+            v.key("Escape")
+            self.assertTrue(at_menu(v))
+        finally:
+            v.quit()
+
+    def test_02_save_and_start(self):
+        v = start_editor(self.d64)
+        try:
+            v.key("7")
+            v.type("LINK TEST ")
+            v.key("Escape")
+            for prog, (intro, _) in self.CASES.items():
+                with self.subTest(save=prog):
+                    self.link(v, prog)
+                    v.key("Escape")
+                    self.assertTrue(at_menu(v))
+                    self.assertEqual(v.screen_text(10)[9].strip(), "8 LINK PROGRAM  " + prog.upper())
+                    v.key("0")
+                    v.type(intro)
+                    v.key("Return")
+                    self.assertTrue(wait_menu(v, timeout=300))
+                    self.assertEqual(status_line(v), "00, OK,00,00")
+        finally:
+            v.quit()
+        for prog, (intro, border) in self.CASES.items():
+            with self.subTest(start=prog):
+                data = self.programs[prog]
+                load = data[0] | data[1] << 8
+                f = Vice(["-8", str(self.d64), "-keybuf", f'load"{intro.lower()}",8\\nrun\\n'])
+                try:
+                    self.assertTrue(f.wait_until(lambda: f.peek(0x01)[0] == 0x35, timeout=120))
+                    time.sleep(1)
+                    f.key("space", hold=0.2, after=3)
+                    self.assertEqual(f.peek(0xD020)[0] & 0x0F, border)
+                    if load == 0x0801:
+                        self.assertIn("LINKED OK", "\n".join(f.screen_text(10)))
+                    body = list(data[2:])
+                    for off in (0, len(body) // 2, len(body) - 64):
+                        self.assertEqual(f.peek(load + off, 64), body[off:off + 64],
+                                         f"{prog} data at +{off}")
+                finally:
+                    f.quit()

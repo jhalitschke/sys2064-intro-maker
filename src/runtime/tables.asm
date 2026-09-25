@@ -12,15 +12,18 @@
 
 // Small tables: emitted where this file is imported (runtime segment)
 // 8 presets x 15 colours, symmetric gradients
-rt_presets:
-        .byte 6, 6,14,14, 3, 3, 1, 1, 1, 3, 3,14,14, 6, 6   // blue
-        .byte 2, 2, 8, 8,10,10, 7, 1, 7,10,10, 8, 8, 2, 2   // fire
-        .byte 11,11,5, 5,13,13, 1, 1, 1,13,13, 5, 5,11,11   // green
-        .byte 11,11,12,12,15,15,1, 1, 1,15,15,12,12,11,11   // grey
-        .byte 6, 6, 4, 4,10,10, 1, 1, 1,10,10, 4, 4, 6, 6   // purple
-        .byte 9, 9, 8, 8, 7, 7, 1, 1, 1, 7, 7, 8, 8, 9, 9   // gold
-        .byte 6, 6, 3, 3,13,13, 1, 1, 1,13,13, 3, 3, 6, 6   // cyan
-        .byte 2, 8, 7, 5, 3,14, 6, 1, 6,14, 3, 5, 7, 8, 2   // rainbow
+// symmetric gradients: first 8 of 15 colours, mirrored by rt_tables_init
+// into rt_presets (RAM)
+rt_preset_halves:
+        .byte 6, 6,14,14, 3, 3, 1, 1        // blue
+        .byte 2, 2, 8, 8,10,10, 7, 1        // fire
+        .byte 11,11,5, 5,13,13, 1, 1        // green
+        .byte 11,11,12,12,15,15,1, 1        // grey
+        .byte 6, 6, 4, 4,10,10, 1, 1        // purple
+        .byte 9, 9, 8, 8, 7, 7, 1, 1        // gold
+        .byte 6, 6, 3, 3,13,13, 1, 1        // cyan
+        .byte 2, 8, 7, 5, 3,14, 6, 1        // rainbow
+.errorif * - rt_preset_halves != PRESET_COUNT * PRESET_HALF, "preset table size"
 rt_preset_offs:
         .fill PRESET_COUNT, i * BAR_HEIGHT
 rt_bar_phase_offs:

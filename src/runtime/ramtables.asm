@@ -19,6 +19,32 @@ rt_tables_init:
         bpl !-
         lda #RT_D011
         sta fld_tab + FLD_LINES - 1
+        // presets: colour j of 15 = half[j < 8 ? j : 14 - j]
+        ldx #PRESET_COUNT * BAR_HEIGHT - 1
+        ldy #BAR_HEIGHT - 1         // j
+        lda #(PRESET_COUNT - 1) * PRESET_HALF
+        sta rt_t1                   // half table base of this preset
+!:      tya
+        cmp #PRESET_HALF
+        bcc !+
+        eor #$ff                    // 14 - j (carry set)
+        adc #BAR_HEIGHT - 1
+!:      clc
+        adc rt_t1
+        sty rt_t0
+        tay
+        lda rt_preset_halves,y
+        sta rt_presets,x
+        ldy rt_t0
+        dey
+        bpl !+
+        ldy #BAR_HEIGHT - 1
+        lda rt_t1
+        sec
+        sbc #PRESET_HALF
+        sta rt_t1
+!:      dex
+        bpl !---
         // sine tables
         ldx #SIN_LEN - 1
 rti_loop:

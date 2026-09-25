@@ -194,7 +194,36 @@ def raw_files(tmp: Path) -> dict[str, bytes]:
         "raw-short": b"\x00\x20" + bytes(100),
         "raw-big": (tmp / "build" / "bigfonts" / "big-test.prg").read_bytes(),
     })
+    files.update(linked_programs())
     return files
+
+
+def basic_prg(lines: list[tuple[int, bytes]]) -> bytes:
+    """Tokenised BASIC program at $0801 from (line number, token bytes)."""
+    addr, out = 0x0801, bytearray()
+    for num, body in lines:
+        nxt = addr + 4 + len(body) + 1
+        out += struct.pack("<HH", nxt, num) + body + b"\x00"
+        addr = nxt
+    return struct.pack("<H", 0x0801) + bytes(out) + b"\x00\x00"
+
+
+POKE, PRINT, REM = 0x97, 0x99, 0x8F
+
+
+def linked_programs() -> dict[str, bytes]:
+    """Programs to link in front of: BASIC (RUN), ML with overlapping move,
+    ML high up. Each sets the border colour so the test can see it ran."""
+    pad = [(100 + i, bytes([REM]) + b" " + b"X" * 70) for i in range(120)]   # ~9 KB
+    basic = basic_prg([(10, bytes([POKE]) + b"53280,5"),
+                       (20, bytes([PRINT]) + b'"LINKED OK"')] + pad + [(999, b"\x80")])
+    def ml(load: int, size: int, colour: int) -> bytes:
+        code = bytes([0xA9, colour, 0x8D, 0x20, 0xD0, 0x4C, load & 0xFF, (load >> 8) + 0])
+        code = code[:5] + bytes([0x4C, (load + 5) & 0xFF, (load + 5) >> 8])
+        body = code + bytes((i * 7 + 3) & 0xFF for i in range(len(code), size))
+        return struct.pack("<H", load) + body
+    return {"link-basic": basic, "link-ml5000": ml(0x5000, 0x3000, 7),
+            "link-mlc000": ml(0xC000, 0x0800, 2)}
 
 
 def add_raw_files(d64: Path, tmp: Path):

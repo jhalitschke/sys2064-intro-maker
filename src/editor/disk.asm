@@ -128,7 +128,12 @@ sv_save:
         lda #>runtime_start
         sta ENTRY_OPERAND + 1
         Print(0, UI_STATUS_ROW, UI_COL_STATUS, str_saving)
-        lda ed_fname_len
+        lda cfg_link_len
+        ora cfg_link_len + 1
+        beq !+
+        jsr link_save               // leaves the drive status
+        jmp sv_patch_back
+!:      lda ed_fname_len
         ldx #<ed_fname
         ldy #>ed_fname
         jsr SETNAM
@@ -148,13 +153,16 @@ sv_save:
         iny
 !:      lda #SAVE_PTR
         jsr SAVE
+        jsr sv_patch_back
+        jsr ed_status_clear
+        ldx #0
+        jmp disk_read_status
+sv_patch_back:
         lda #<editor_start          // patch back, or the editor would
         sta ENTRY_OPERAND           // start the runtime next time
         lda #>editor_start
         sta ENTRY_OPERAND + 1
-        jsr ed_status_clear
-        ldx #0
-        jmp disk_read_status
+        rts
 
 // ---- drive status ----------------------------------------------------------
 // read the error channel into ed_status_buf from position X on
@@ -168,15 +176,25 @@ disk_read_status:
         jsr SETLFS
         jsr OPEN
         bcs drs_close
+        ldx ed_t3
+        jsr drs_read_open
+drs_close:
+        jsr CLRCHN
+        lda #LFN_CMD
+        jmp CLOSE
+
+// read the open command channel into ed_status_buf from position X on
+drs_read_open:
+        stx ed_t3
         ldx #LFN_CMD
         jsr CHKIN
-        bcs drs_close
+        bcs drs_done
 drs_loop:
         jsr READST
-        bne drs_close               // EOF, timeout or device not present
+        bne drs_done                // EOF, timeout or device not present
         jsr CHRIN
         cmp #PET_CR
-        beq drs_close
+        beq drs_done
         jsr ui_pet2sc
         bcc !+
         lda #SC_UNKNOWN & SC_MAX
@@ -186,10 +204,8 @@ drs_loop:
         sta ed_status_buf,x
         inc ed_t3
         jmp drs_loop
-drs_close:
-        jsr CLRCHN
-        lda #LFN_CMD
-        jmp CLOSE
+drs_done:
+        jmp CLRCHN
 
 // A/Y = string -> ed_status_buf (padded), X = length
 ed_status_set:

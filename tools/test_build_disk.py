@@ -144,7 +144,7 @@ class CatalogTests(unittest.TestCase):
         fonts = [self.entry("font", "Font", "font-b"), self.entry("font", "F2", "c")]
         big = [self.entry("bigfont", "Big", "big-c")]
         cat = bd.build_catalog(sids, fonts, big)
-        self.assertEqual(cat[:2], b"\x00\x60")
+        self.assertEqual(cat[:2], b"\x00\x68")
         body = cat[2:]
         self.assertEqual(body[:4], bytes([1, 2, 1, 0]))
         self.assertEqual(len(body), 4 + 4 * 48)

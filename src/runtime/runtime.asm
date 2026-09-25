@@ -10,6 +10,11 @@ runtime_start:
         sei
         lda #CPU_IO_ONLY
         sta CPU_PORT
+        ldx #ZP_RT_END - ZP_RT_START - 1
+!:      lda ZP_RT_START,x           // BASIC's zero page, for a linked
+        sta RT_ZP_SAVE,x            // program started after the intro
+        dex
+        bpl !-
         lda #CIA_IRQ_ALL_OFF
         sta CIA1_ICR
         sta CIA2_ICR
@@ -85,6 +90,7 @@ rt_wait:
         sta VIC_IRQ_ENABLE
         sta VIC_SPR_ENABLE
         sta SID_VOLUME
+        jsr rt_link_start           // returns without a linked program
         lda #CPU_DEFAULT
         sta CPU_PORT
         jmp KERNAL_RESET

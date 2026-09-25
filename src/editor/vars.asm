@@ -27,6 +27,9 @@ ed_load:        .word 0             // tune being checked
 ed_init:        .word 0
 ed_play:        .word 0
 ed_sub:         .byte 0
+ed_link_name_len: .byte 0           // linked program (PETSCII name)
+ed_link_name:   .fill DIR_NAME_LEN, 0
+ed_hex_buf:     .fill 4, 0
 .errorif ed_font_name != ed_music_name + CAT_NAME_LEN, "name buffers must be adjacent"
 .errorif ed_bigfont_name != ed_font_name + CAT_NAME_LEN, "name buffers must be adjacent"
 // ROM 2X2 (Scale2x) scratch
@@ -48,3 +51,4 @@ s2_e2:          .byte 0
 s2_e3:          .byte 0
 .errorif * > ED_VARS_END, "editor variables overflow"
 .errorif DIR_LENS + DIR_MAX > spread_lo, "directory table overlaps the spread tables"
+.errorif ED_VARS < DIR_LENS + DIR_MAX, "editor variables overlap the directory table"

@@ -96,7 +96,34 @@ band rows from a pre-rendered title image (`TITLE_IMG`, RAM under the KERNAL).
   (`title_apply`), so a late main loop delays the title by a frame instead of
   shaking it.
 
-## 4. Memory map changes
+## 4. Linking a program behind the intro
+
+`LINK PROGRAM` (menu key 8) puts the intro in front of a PRG from disk (a
+game, a demo, a BASIC program). In the saved intro SPACE starts that
+program instead of resetting the machine.
+
+- `1` picks the program from the directory. The editor reads its load
+  address and measures its length with a KERNAL `VERIFY` (the whole file is
+  read, nothing is written). Programs must load at `$0400` or higher, end
+  below `$D000` and be at most 36 688 bytes long.
+- `2` toggles the start: `RUN` (default for programs at `$0801`) or `SYS` at
+  the load address; `3` enters another SYS address (4 hex digits); `4`
+  removes the program.
+- Save (`0`) writes one PRG: the intro `$0801-$3FFF`, then the 176-byte mover
+  (`$4000`), then the program data (`$40B0`). It streams the program from its
+  file (`OPEN`/`CHROUT`, 8 KB chunks through `FILE_BUF`); the program must be
+  on the disk the intro is saved to. The source is opened and checked first,
+  so a missing file leaves nothing behind; an existing target name shows
+  `63, FILE EXISTS`.
+- SPACE in the saved intro: IRQs off, the runtime copies the mover to the
+  tape buffer (`$033C`) and its parameters (`cfg_link_len` … `cfg_link_src`)
+  to zero page `$06-$0D`. The mover copies the data to the load address
+  (forwards or backwards, overlaps are fine), restores the BASIC zero page
+  `$02-$1F` saved at intro start, switches the ROMs back in, calls
+  `IOINIT`/`RESTOR`/`CINT`, sets `VARTAB` to the program end and starts with
+  `JSR $A659 / JMP $A7AE` (RUN) or `JMP` to the SYS address.
+
+## 5. Memory map changes
 
 | Area | Use |
 |---|---|
@@ -105,20 +132,25 @@ band rows from a pre-rendered title image (`TITLE_IMG`, RAM under the KERNAL).
 | `$28B0-$28FF` | runtime work area (title layout, colour cycle row) |
 | `$2900-$297F` | movement sine table (signed) |
 | `$2980-$2BFF` | runtime code segment 2 |
-| `$7000-$8FFF` | editor: file buffer (directory, files from disk) |
+| `$4000-$67FF` | editor code (was `$4000-$5FFF`) |
+| `$6800-$6FFF` | editor: catalog (was `$6000`) |
+| `$7000-$8FFF` | editor: file buffer (directory, files from disk, link chunks) |
 | `$9000-$99FF` | editor: directory table |
+| `$9A00-$9BFF` | editor variables (were `$6800`) |
 | `$9C00-$9FFF` | editor: Scale2x bit spreading tables |
-| `$E000-$E3FF` | runtime: bar buffers, FLD table, sprite/bar sines, title image (RAM under the KERNAL, built at start, not saved) |
+| `$E000-$E47F` | runtime: bar buffers, FLD table, sprite/bar sines, title image, bar presets, saved BASIC zero page (RAM under the KERNAL, built at start, not saved) |
+| `$033C-$03EB` | linked program: mover, at exit only |
 
 Config block v2 (additions, offsets from `$2800`): `+$60` W, `+$61` H,
 `+$62` multicolour, `+$63/$64` MC colours, `+$65` movement, `+$66` movement
 speed, `+$68` linked program length, `+$6A` its load address, `+$6C` its
-start address, `+$70` big font map (64 bytes).
+start address (0 = RUN), `+$6E` its data in the saved file, `+$70` big font
+map (64 bytes).
 
 Catalog v2: header `n_sids, n_fonts, n_bigfonts, 0`, records from `+4`
 (max. 15 tunes, 15 fonts, 12 big fonts).
 
-## 5. Main menu
+## 6. Main menu
 
 ```
 1 MUSIC  2 FONT  3 COLORS  4 EFFECTS  5 TITLE  6 TITLE STYLE

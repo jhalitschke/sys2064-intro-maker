@@ -29,6 +29,11 @@
 .const CFG_LINK_LEN      = $68      // 2: linked program length, 0 = none
 .const CFG_LINK_DEST     = $6a      // 2: its load address
 .const CFG_LINK_START    = $6c      // 2: SYS address, 0 = BASIC RUN
+.const CFG_LINK_SRC      = $6e      // 2: program data in the saved file
+.const MOVER_SIZE        = MOVER_SIZE_M   // mover code, saved in front of the data
+.const MOVER_TAPE_END    = $3fc     // tape buffer end
+.errorif MOVER_ADDR + MOVER_SIZE > MOVER_TAPE_END, "mover too large for the tape buffer"
+.errorif MV_SRC - MV_LEN != CFG_LINK_SRC - CFG_LINK_LEN, "mover parameters layout"
 .const CFG_BIG_MAP       = $70      // 64: first tile per screen code, 0 = blank
 .const CFG_SIZE          = CFG_BIG_MAP + BIG_GLYPHS
 .errorif CFG_BIG_W < CFG_TITLE + TITLE_LEN, "config fields overlap the title"
@@ -57,6 +62,7 @@
 .label cfg_link_len      = CONFIG + CFG_LINK_LEN
 .label cfg_link_dest     = CONFIG + CFG_LINK_DEST
 .label cfg_link_start    = CONFIG + CFG_LINK_START
+.label cfg_link_src      = CONFIG + CFG_LINK_SRC
 .label cfg_big_map       = CONFIG + CFG_BIG_MAP
 
 // ---- Flags ----------------------------------------------------------------
@@ -81,6 +87,7 @@
 .const DEF_PLAY          = SID_START + 3
 .const DEF_SUBTUNE       = 0
 .const PRESET_COUNT      = 8
+.const PRESET_HALF       = 8        // stored colours per preset (mirrored)
 .const DEF_MOVE          = 0        // MOVE_STATIC
 .const DEF_MOVE_SPEED    = 2
 .const DEF_BIG_MC1       = 11
@@ -191,6 +198,8 @@
 .const LFN_CMD           = 15       // command / error channel
 .const SA_CMD            = 15
 .const LFN_FILE          = 2
+.const LFN_OUT           = 3
+.const SA_WRITE          = 1        // OPEN for writing a PRG
 .const SA_READ           = 0        // load channel: "$" gives the listing
 .const ST_EOF            = $40      // READST bits
 .const ST_ERRORS         = $83      // timeouts, device not present
@@ -275,6 +284,9 @@
 .const FONT_BUILTIN_BOLD = 1        // font list: 0 ROM, 1 ROM BOLD, catalog
 .const FONT_BUILTINS     = 2
 .const ES_KEY_COUNT      = 11       // scroll text editor command keys
+.const ED_LINK_ITEMS     = 4
+.const SC_MINUS          = $2d
+.const SC_DOLLAR         = $24
 .const ES_CODE_COUNT     = 4        // control codes
 .const MAX_SPEED         = 4
 .errorif UI_LIST_ROW + UI_LIST_ROWS > 20, "list must fit rows 4-19"

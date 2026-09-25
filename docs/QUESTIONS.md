@@ -27,3 +27,8 @@ handled for now.
 8. **E2E test dependency.** The optional end-to-end tests use `python-xlib`
    for real key presses (the spec allows `-keybuf`, which cannot reach code
    that scans the CIA directly). The build tools stay standard-library only.
+9. **Linked programs.** The linker needs the exact program length before it
+   writes the file (the config block comes first). It measures it with a
+   KERNAL `VERIFY`, so the program file is read twice in total. Programs
+   that are not plain PRGs loading below `$D000` (e.g. with their own
+   loader, or files for a fast loader) are out of scope.

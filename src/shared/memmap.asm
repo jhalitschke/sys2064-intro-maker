@@ -126,15 +126,15 @@
 .label TEXT_END          = VIC_IDLE_BYTE // exclusive, incl. $ff terminator
 .const TEXT_MAX          = TEXT_END - TEXT - 1  // 5118 characters
 .label EDITOR_CODE       = $4000
-.label EDITOR_END        = $6000
-.label CATALOG           = $6000
-.label CATALOG_END       = $6800
-.label ED_VARS           = $6800
-.label ED_VARS_END       = $7000
+.label EDITOR_END        = $6800
+.label CATALOG           = $6800
+.label CATALOG_END       = $7000
 .label FILE_BUF          = $7000    // files / directory read from disk
 .label FILE_BUF_END      = $9000
 .label DIR_NAMES         = $9000    // DIR_MAX x 16 byte names (PETSCII)
 .label DIR_LENS          = $9900    // DIR_MAX name lengths
+.label ED_VARS           = $9a00    // editor variables
+.label ED_VARS_END       = $9c00
 .label spread_lo         = $9c00    // ROM 2X2 bit spreading tables
 .label spread_hi         = $9d00
 .label spread_lo_s       = $9e00
@@ -208,7 +208,9 @@
 .label spr_y             = RT_RAM + $200
 .label TITLE_IMG         = RT_RAM + $280            // title drawn at row/col 0
 .const TITLE_IMG_SIZE    = BAND_ROWS * SCREEN_COLS
-.label RT_RAM_END        = TITLE_IMG + TITLE_IMG_SIZE
+.label rt_presets        = TITLE_IMG + TITLE_IMG_SIZE // 8 x 15 bar colours
+.label RT_ZP_SAVE        = rt_presets + 8 * 15      // BASIC zero page at start
+.label RT_RAM_END        = RT_ZP_SAVE + ZP_RT_END - ZP_RT_START
 .errorif (RT_RAM & $ff) != 0, "RT_RAM must be page aligned"
 .errorif (border_buf >> 8) != ((border_buf + FLD_LINES - 1) >> 8), "border_buf crosses a page"
 .errorif (bg_buf >> 8) != ((bg_buf + FLD_LINES - 1) >> 8), "bg_buf crosses a page"
@@ -282,6 +284,27 @@
 
 // ---- KERNAL ---------------------------------------------------------------
 .label KERNAL_IRQ_EXIT   = $ea31
+.label BASIC_RUN_INIT    = $a659    // RUN: reset text pointer + CLR
+.label BASIC_NEWSTT      = $a7ae    // interpreter loop
+.label VARTAB            = $2d      // end of the BASIC program
+.label CINT              = $ff81
+.label IOINIT            = $ff84
+.label RESTOR            = $ff8a
+.label VERIFY_END        = $ae      // 2: end address after LOAD/VERIFY
+// linked program: mover in the tape buffer, parameters in zero page
+.label MOVER_ADDR        = $033c
+.label MV_LEN            = $06      // = cfg_link_len .. cfg_link_src copy
+.label MV_DEST           = $08
+.label MV_START          = $0a
+.label MV_SRC            = $0c
+.label MV_S              = $02      // 2: source pointer
+.label MV_D              = $04      // 2: destination pointer
+.label LINK_DEST_MIN     = $0400    // programs must not load below
+.label LINK_END_MAX      = $d000    // nor reach the I/O area
+.label LINK_MOVER        = EDITOR_CODE  // saved file: intro up to $3fff,
+.const MOVER_SIZE_M      = 176
+.label LINK_SRC          = LINK_MOVER + MOVER_SIZE_M  // mover, program
+.errorif LINK_MOVER != VIC_IDLE_BYTE + 1, "linked data follows $3fff"
 .label KERNAL_RESET      = $fce2
 .label SETMSG            = $ff90
 .label SETLFS            = $ffba
@@ -290,6 +313,8 @@
 .label CLOSE             = $ffc3
 .label CHKIN             = $ffc6
 .label CLRCHN            = $ffcc
+.label CHKOUT            = $ffc9
+.label CHROUT            = $ffd2
 .label CHRIN             = $ffcf
 .label LOAD              = $ffd5
 .label SAVE              = $ffd8
