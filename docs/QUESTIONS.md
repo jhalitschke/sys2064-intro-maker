@@ -22,6 +22,9 @@ handled for now.
    `CHARS n/5118` in the status row 24.
 6. **DEL in the title editor.** The spec only says "overwrite mode". DEL moves
    the cursor left and blanks that character.
-7. **Smoke test cycles.** The unpacked editor (73 blocks) needs more than
-   40 M cycles to autostart from the D64 with the standard KERNAL loader;
-   `make smoke` uses 80 M cycles for the editor screenshot.
+7. **Headless tests.** `make smoke` and `make e2e` always use `xvfb-run`,
+   also when `DISPLAY` is set, so no VICE window (and no XTEST key press)
+   reaches the real desktop.
+8. **E2E test dependency.** The optional end-to-end tests use `python-xlib`
+   for real key presses (the spec allows `-keybuf`, which cannot reach code
+   that scans the CIA directly). The build tools stay standard-library only.

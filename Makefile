@@ -9,7 +9,9 @@ MANIFEST ?= assets/manifest.toml
 
 BUILD     := build
 ABS_BUILD := $(abspath $(BUILD))
-XVFB      := $(if $(DISPLAY),,xvfb-run -a)
+# always headless: VICE windows (and XTEST key presses in e2e) must never
+# reach the real desktop
+XVFB      := xvfb-run -a
 KFLAGS    := -odir $(ABS_BUILD)
 SRC       := $(shell find src -name '*.asm')
 
@@ -19,7 +21,7 @@ FIXTURE_ARGS  := $(if $(FIXTURE_FLAGS),:flags=$(FIXTURE_FLAGS),)
 
 VICE_SMOKE := -default -pal -warp -sounddev dummy
 
-.PHONY: all disk fixture run run-fixture test smoke clean
+.PHONY: all disk fixture run run-fixture test smoke e2e clean
 
 all: disk
 disk: $(BUILD)/intromaker.d64
@@ -32,12 +34,18 @@ $(BUILD)/testtune.prg: assets/testtune/testtune.asm src/shared/memmap.asm | $(BU
 
 $(BUILD)/editor.prg: $(SRC) | $(BUILD)
 	$(KICKASS) src/main.asm $(KFLAGS) -o $(abspath $@)
+	cp $(BUILD)/main.sym $(BUILD)/editor.sym
 
-$(BUILD)/intromaker.d64: $(BUILD)/editor.prg $(BUILD)/testtune.prg $(MANIFEST) tools/build_disk.py
-	$(PYTHON) tools/build_disk.py --manifest $(MANIFEST) --editor $(BUILD)/editor.prg --out $@ --c1541 $(C1541)
+# packed editor: self-extracting, starts via the SYS line of the stub
+$(BUILD)/editor.exo.prg: $(BUILD)/editor.prg
+	$(EXOMIZER) sfx sys -n -q -o $@ $<
+
+$(BUILD)/intromaker.d64: $(BUILD)/editor.exo.prg $(BUILD)/testtune.prg $(MANIFEST) tools/build_disk.py
+	$(PYTHON) tools/build_disk.py --manifest $(MANIFEST) --editor $(BUILD)/editor.exo.prg --out $@ --c1541 $(C1541)
 
 fixture: $(BUILD)/testtune.prg
 	$(KICKASS) src/main.asm -define FIXTURE $(FIXTURE_ARGS) $(KFLAGS) -o $(ABS_BUILD)/fixture.prg
+	cp $(BUILD)/main.sym $(BUILD)/fixture.sym
 
 run: disk
 	$(X64) -autostart $(BUILD)/intromaker.d64
@@ -53,9 +61,15 @@ smoke: fixture disk
 	rm -f $(BUILD)/fixture.png $(BUILD)/editor.png
 	-$(XVFB) $(X64) $(VICE_SMOKE) -limitcycles 20000000 \
 	    -exitscreenshot $(BUILD)/fixture.png -autostartprgmode 1 -autostart $(BUILD)/fixture.prg
-	-$(XVFB) $(X64) $(VICE_SMOKE) -limitcycles 80000000 \
+	-$(XVFB) $(X64) $(VICE_SMOKE) -limitcycles 40000000 \
 	    -exitscreenshot $(BUILD)/editor.png -autostart $(BUILD)/intromaker.d64
 	test -f $(BUILD)/fixture.png && test -f $(BUILD)/editor.png
+
+# End-to-end tests in VICE with real key presses (needs python-xlib), ~10 min.
+# Single file: make e2e E2E=test_editor
+E2E ?= test_*
+e2e: disk fixture
+	E2E_HEADLESS=1 $(XVFB) $(PYTHON) -m unittest discover -s tests/e2e -t tests/e2e -p '$(E2E).py' -v
 
 clean:
 	rm -rf $(BUILD)

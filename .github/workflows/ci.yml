@@ -33,6 +33,12 @@ jobs:
           chmod +x "$HOME/bin/kickass"
           echo "$HOME/bin" >> "$GITHUB_PATH"
 
+      - name: Install Exomizer
+        run: |
+          git clone -q --depth 1 https://bitbucket.org/magli143/exomizer.git "$HOME/exomizer"
+          make -s -C "$HOME/exomizer/src"
+          cp "$HOME/exomizer/src/exomizer" "$HOME/bin/"
+
       - name: Unit tests
         run: make test
 
@@ -44,5 +50,6 @@ jobs:
           name: intromaker
           path: |
             build/intromaker.d64
+            build/editor.prg
             build/fixture.prg
             build/CREDITS.txt
