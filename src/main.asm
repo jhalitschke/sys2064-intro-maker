@@ -4,7 +4,6 @@
 // ---------------------------------------------------------------------------
 #import "shared/memmap.asm"
 #import "shared/config.asm"
-#import "runtime/tables.asm"
 
 * = BASIC_START "basic stub"
         .word stub_end              // next line
@@ -32,7 +31,7 @@ stub_end:
 #import "runtime/bars.asm"
 #import "runtime/sprites.asm"
 #import "runtime/colorcycle.asm"
-        RuntimeSmallTables()
+#import "runtime/tables.asm"
 .errorif * > RT_CODE_END, "runtime code overflow"
 
 * = SPRITE_DATA "sprite ball"

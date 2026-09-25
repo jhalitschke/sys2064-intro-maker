@@ -25,6 +25,7 @@
 }
 
 // ---- BARS: double IRQ ------------------------------------------------------
+// Budget: lines 128-211 completely (2 lines stabilising, 80 lines loop).
 // Stage 1 at line $80 (128). Entry jitter: 7 IRQ cycles + 0..3 cycles of
 // the interrupted main loop instruction.
 irq_bars:
@@ -114,8 +115,9 @@ irq_bars_end:
 
 
 // ---- TOP -------------------------------------------------------------------
-// Budget: sprites ~350, colour cycle ~950, bar buffers ~2300 cycles
-// = ~58 lines -> done by line ~75, well before BARS at $80.
+// Budget: sprites ~350, colour cycle ~960, bar buffers ~2300 cycles
+// (+ sprite DMA from line 76). Measured in x64sc with all flags set:
+// done by raster line 76, well before BARS at $80 (128).
 irq_top:
         IrqEnter()
         lda #RT_D016
@@ -127,10 +129,12 @@ irq_top:
         jsr spr_update
         jsr cyc_update
         jsr bars_prepare
+irq_top_done:                       // (label for timing measurements)
         IrqNext(irq_bars, IRQ_BARS_LINE)
         jmp irq_exit
 
 // ---- SCROLL ----------------------------------------------------------------
+// Budget: ~60 cycles (one raster line).
 irq_scroll:
         IrqEnter()
         lda rt_xscroll
@@ -140,8 +144,8 @@ irq_scroll:
         jmp irq_exit
 
 // ---- BOTTOM ----------------------------------------------------------------
-// Budget: SID play (tune dependent) + scroller ~500 cycles; 80 lines
-// available until TOP of the next frame.
+// Budget: SID play (tune dependent) + scroller ~500 cycles. Measured with
+// the test tune: done by raster line 261; 80 lines are available until TOP.
 irq_bottom:
         IrqEnter()
         lda #RT_D016
@@ -152,6 +156,7 @@ irq_bottom:
 rt_play_call:
         jsr DEF_PLAY                // operand patched in runtime_start
 !:      jsr scroll_update
+irq_bottom_done:                    // (label for timing measurements)
         lda #KEY_ROW_SPACE
         sta CIA1_PRA
         lda CIA1_PRB

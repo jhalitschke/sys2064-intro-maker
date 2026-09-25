@@ -31,8 +31,7 @@
     .return round((SPR_X_MIN + SPR_X_MAX) / 2 + (SPR_X_MAX - SPR_X_MIN) / 2 * sin(toRadians(i * 360 / SIN_LEN)))
 }
 
-// Small tables: emitted inside the runtime code segment
-.macro RuntimeSmallTables() {
+// Small tables: emitted where this file is imported (runtime segment)
 // 8 presets x 15 colours, symmetric gradients
 rt_presets:
         .byte 6, 6,14,14, 3, 3, 1, 1, 1, 3, 3,14,14, 6, 6   // blue
@@ -53,7 +52,6 @@ rt_cyc_tab:
         .byte 9, 2, 8,10,15, 7, 1, 1, 1, 7,15,10, 8, 2, 9, 9
 rt_spr_colors:
         .byte 1, 7, 3, 5,13,14,10,15
-}
 
 // 21x21 ball, generated
 .macro SpriteBall() {
