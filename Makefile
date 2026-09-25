@@ -52,7 +52,7 @@ smoke: fixture disk
 	rm -f $(BUILD)/fixture.png $(BUILD)/editor.png
 	-$(XVFB) $(X64) $(VICE_SMOKE) -limitcycles 20000000 \
 	    -exitscreenshot $(BUILD)/fixture.png -autostartprgmode 1 -autostart $(BUILD)/fixture.prg
-	-$(XVFB) $(X64) $(VICE_SMOKE) -limitcycles 40000000 \
+	-$(XVFB) $(X64) $(VICE_SMOKE) -limitcycles 80000000 \
 	    -exitscreenshot $(BUILD)/editor.png -autostart $(BUILD)/intromaker.d64
 	test -f $(BUILD)/fixture.png && test -f $(BUILD)/editor.png
 

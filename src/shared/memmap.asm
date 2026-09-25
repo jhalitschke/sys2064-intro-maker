@@ -46,7 +46,9 @@
 .label ed_num            = $2f      // 2: number to print
 .label ed_digit          = $31
 .label ed_lead           = $32
-.const ZP_ED_END         = $33
+.label ed_n_count        = $33
+.label ed_n_index        = $34
+.const ZP_ED_END         = $35
 .errorif ZP_ED_END > $40, "editor zero page overflow"
 
 // KERNAL zero page / system variables used by the editor

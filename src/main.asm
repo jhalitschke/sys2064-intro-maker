@@ -51,8 +51,13 @@ stub_end:
         .byte TEXT_END_MARK
 
 * = EDITOR_CODE "editor"
-editor_start:
-        inc VIC_BORDER
-        jmp editor_start
+#import "editor/editor.asm"
+#import "editor/irq.asm"
+#import "editor/ui.asm"
+#import "editor/lists.asm"
+#import "editor/textedit.asm"
+#import "editor/disk.asm"
+#import "editor/fonts.asm"
 .errorif * > EDITOR_END, "editor code overflow"
+#import "editor/vars.asm"
 #endif

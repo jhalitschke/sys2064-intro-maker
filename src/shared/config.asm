@@ -70,6 +70,14 @@
 .const SC_REVERSE        = $80
 .const SC_REV_SPACE      = SC_SPACE | SC_REVERSE
 .const XSCROLL_START     = 7
+.const SC_DIGIT_0        = $30
+.const SC_CTRL_SPEED1    = $31 | SC_REVERSE     // shown as reverse 1/2/4/P
+.const SC_CTRL_SPEED2    = $32 | SC_REVERSE
+.const SC_CTRL_SPEED4    = $34 | SC_REVERSE
+.const SC_CTRL_PAUSE     = $10 | SC_REVERSE
+.const SC_UNKNOWN        = $3f | SC_REVERSE
+.const STR_END           = $ff      // editor string terminator
+.const UI_POW10_COUNT    = 4        // up to 4 decimal digits
 
 // ---- Title colour cycle / sprites / bars ----------------------------------
 .const CYC_LEN           = 16
@@ -144,6 +152,21 @@
 .const UI_FNAME_ROW      = 10
 .const UI_FNAME_COL      = 6
 .const UI_FLASH_JIFFIES  = 5
+.const UI_TEXTLEN_COL    = 13       // "(n/5118)" behind "6 SCROLLTEXT"
+.const UI_BLOCK_COL      = 16       // colour blocks / effect values
+.const SC_PAREN_OPEN     = $28
+.const MIN_DRIVE         = 8
+.const ED_MENU_ITEMS     = 8        // main menu keys 1-8
+.const ED_COLOR_ITEMS    = 4        // border, background, scroller, title
+.const ED_EFFECT_ITEMS   = 6
+.const ED_EFFECT_PRESET  = 2        // effect entry index of the bar preset
+.const LIST_MUSIC        = 0
+.const LIST_FONT         = 1
+.const FONT_BUILTIN_BOLD = 1        // font list: 0 ROM, 1 ROM BOLD, catalog
+.const FONT_BUILTINS     = 2
+.const ES_KEY_COUNT      = 11       // scroll text editor command keys
+.const ES_CODE_COUNT     = 4        // control codes
+.const MAX_SPEED         = 4
 .errorif UI_LIST_ROW + UI_LIST_ROWS > 20, "list must fit rows 4-19"
 .errorif 1 + CAT_MAX_SIDS > UI_LIST_ROWS, "music list too long"
 .errorif 2 + CAT_MAX_FONTS > UI_LIST_ROWS, "font list too long"
