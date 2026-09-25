@@ -14,8 +14,11 @@ in RAM (`$0801` up to the end of the scroll text), so "save" is one KERNAL
 
 ## Features
 
-- **Music**: any frame-based PSID/PRG tune linked to `$1000` (max. 4 KB), or no music.
-- **Fonts**: ROM font, bold ROM font, or 1x1 fonts from the disk (chars `$00-$3F`).
+- **Music**: any frame-based PSID/PRG tune linked to `$1000` (max. 4 KB), or no music –
+  from the catalog of the intro maker disk or as a file from **any disk**
+  (PSID files are checked on the C64 itself).
+- **Fonts**: ROM font, bold ROM font, or 1x1 fonts (chars `$00-$3F`) from the
+  catalog or from any disk.
 - **Colours**: border, background, scroller and title colour.
 - **Effects** (each on/off): 3 raster bars in an FLD gap with 8 colour presets,
   bar sine movement, 8 sprite balls on a sine path, title colour cycle,
@@ -39,14 +42,21 @@ Main menu – press the number key:
 
 | Key | Screen | Keys inside |
 |---|---|---|
-| `1` | **MUSIC** list | CRSR up/down, RETURN loads and plays the tune, RUN/STOP back |
-| `2` | **FONT** list | CRSR up/down, RETURN loads the font, RUN/STOP back |
+| `1` | **MUSIC** list | CRSR up/down, RETURN loads and plays the tune, RUN/STOP back; `FROM DISK...` opens the disk directory |
+| `2` | **FONT** list | CRSR up/down, RETURN loads the font, RUN/STOP back; `FROM DISK...` opens the disk directory |
 | `3` | **COLORS** | `1`–`4` step border / background / scroller / title colour |
 | `4` | **EFFECTS** | `1` raster bars, `2` bar sine, `3` bar colours (preset 1–8), `4` sprites, `5` title cycle, `6` scroll speed |
 | `5` | **TITLE** | overwrite mode, 80 chars in 2 rows, CRSR keys, DEL, HOME, RUN/STOP back |
 | `6` | **SCROLLTEXT** | insert mode, CRSR keys (±1 / ±40), DEL, HOME, RUN/STOP back |
 | `7` | **PREVIEW** | SPACE returns to the editor |
 | `8` | **SAVE** | type a file name (1–16 chars), RETURN saves, RUN/STOP cancels |
+
+**Loading from any disk:** swap the disk, choose `FROM DISK...` and pick a
+PRG file from the scrolling directory list. Tunes can be PSID files (copied
+to the disk as they are) or PRG files loading at `$1000` (init `$1000`, play
+`$1003`); RSID, CIA-timed and wrongly linked tunes are rejected with a message
+and the previous tune keeps playing. Fonts are PRG files with a load address
+followed by at least 512 bytes (e.g. `.64c`).
 
 Scroll text control codes (shown reversed in the editor):
 
@@ -113,8 +123,8 @@ license = "..."
 `tools/build_disk.py` validates everything and stops with a clear message:
 RSID tunes, CIA-timed tunes, `play = 0`, tunes not linked to `$1000`
 (relocate them with [sidreloc](https://www.linusakesson.net/software/sidreloc/)),
-data outside `$1000-$1FFF`, fonts under 512 bytes. Up to 15 tunes and 14 fonts
-fit into the lists. `build/CREDITS.txt` lists name, author and license of
+data outside `$1000-$1FFF`, fonts under 512 bytes. Up to 15 tunes and 15 fonts
+fit into the catalog. `build/CREDITS.txt` lists name, author and license of
 every asset.
 
 **Licensing:** only the self-written test tune is part of this repository.

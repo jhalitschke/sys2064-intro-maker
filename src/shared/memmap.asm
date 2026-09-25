@@ -95,6 +95,12 @@
 .label CATALOG_END       = $6800
 .label ED_VARS           = $6800
 .label ED_VARS_END       = $7000
+.label FILE_BUF          = $7000    // files / directory read from disk
+.label FILE_BUF_END      = $9000
+.label DIR_NAMES         = $9000    // DIR_MAX x 16 byte names (PETSCII)
+.label DIR_LENS          = $9900    // DIR_MAX name lengths
+.label ED_WORK_END       = $a000    // BASIC ROM above
+.errorif DIR_NAMES < FILE_BUF_END, "directory table overlaps the file buffer"
 
 .errorif TEXT_MAX != 5118, "text size must be 5118"
 .errorif SPRITE_DATA + 64 > SID_START, "sprite data overlaps SID"

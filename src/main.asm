@@ -57,6 +57,7 @@ stub_end:
 #import "editor/lists.asm"
 #import "editor/textedit.asm"
 #import "editor/disk.asm"
+#import "editor/files.asm"
 #import "editor/fonts.asm"
 .errorif * > EDITOR_END, "editor code overflow"
 #import "editor/vars.asm"

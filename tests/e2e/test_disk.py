@@ -4,8 +4,8 @@ import subprocess
 import time
 import unittest
 
-from helpers import (OUT, at_menu, build_test_disk, cleanup, make, need_display,
-                     start_editor, status_line, wait_menu)
+from helpers import (OUT, at_menu, build_test_disk, cleanup, dir_index, make,
+                     need_display, start_editor, status_line, wait_menu)
 from vice import BUILD, Vice, symbols
 
 CONFIG, FONT, TEXT = 0x2800, 0x2000, 0x2C00
@@ -135,6 +135,98 @@ class DiskTests(unittest.TestCase):
             f.quit()
 
 
+def pick_from_disk(test, v, menu_key, entries_before_disk, name):
+    """Menu key -> FROM DISK... -> directory list -> file `name`."""
+    v.key(menu_key)
+    for _ in range(entries_before_disk):
+        v.key("Down")
+    v.key("Return")
+    test.assertTrue(v.wait_until(
+        lambda: v.screen_text(24)[23].startswith("CRSR SELECT"), timeout=60),
+        "directory list did not appear")
+    for _ in range(dir_index(test.d64, name)):
+        v.key("Down", hold=0.05, after=0.1)
+    v.key("Return")
+    test.assertTrue(wait_menu(v))
+
+
+@need_display
+class DiskBrowserTests(unittest.TestCase):
+    """SIDs and fonts loaded from any file on the disk (no catalog)."""
+    MUSIC_BEFORE_DISK = 3           # NO MUSIC, TEST TUNE, PSID TUNE
+    FONT_BEFORE_DISK = 3            # ROM, ROM BOLD, ITALIC ROM
+
+    @classmethod
+    def setUpClass(cls):
+        make("disk")
+        cls.d64, cls.tmp = build_test_disk()
+        cls.v = start_editor(cls.d64)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.v.quit()
+        cleanup(cls.tmp)
+
+    def music_name(self):
+        return self.v.screen_text(3)[2][len("1 MUSIC:  "):]
+
+    def tune_plays(self):
+        a = self.v.peek(TUNE_TICK + 3)[0]
+        time.sleep(0.5)
+        return self.v.peek(TUNE_TICK + 3)[0] != a
+
+    def test_01_scrolling_directory_list(self):
+        v = self.v
+        v.key("1")
+        for _ in range(self.MUSIC_BEFORE_DISK):
+            v.key("Down")
+        self.assertEqual(v.screen_text(8)[7].strip(), "FROM DISK...")
+        v.key("Return")
+        self.assertTrue(v.wait_until(
+            lambda: v.screen_text(24)[23].startswith("CRSR SELECT"), timeout=60))
+        index = dir_index(self.d64, "raw-psid")
+        self.assertGreater(index, 16, "test disk must need scrolling")
+        for _ in range(index):
+            v.key("Down", hold=0.05, after=0.1)
+        screen = v.peek(0x0400 + 4 * 40, 16 * 40)
+        reversed_rows = [r for r in range(16) if screen[r * 40] & 0x80]
+        self.assertEqual(reversed_rows, [15], "selection must stay in the window")
+        self.assertEqual(v.screen_text(20)[19].strip(), "RAW-PSID")
+        v.key("Escape")
+        self.assertTrue(at_menu(v))
+
+    def test_02_psid_from_disk(self):
+        pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, "raw-psid")
+        self.assertEqual(self.music_name().strip(), "TEST AS PSID")
+        self.assertEqual(self.v.peek(CONFIG + 0x0A, 5), [0x00, 0x10, 0x03, 0x10, 0])
+        self.assertTrue(self.tune_plays())
+
+    def test_03_prg_tune_from_disk(self):
+        pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, "raw-tune")
+        self.assertEqual(self.music_name().strip(), "RAW-TUNE")
+        self.assertTrue(self.tune_plays())
+
+    def test_04_rejected_tunes_keep_the_old_one(self):
+        for name, message in (("raw-rsid", "RSID TUNES ARE NOT SUPPORTED"),
+                              ("raw-cia", "CIA TIMED TUNES ARE NOT SUPPORTED"),
+                              ("raw-c000", "TUNE MUST LOAD AT $1000")):
+            with self.subTest(name=name):
+                pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, name)
+                self.assertEqual(status_line(self.v), message)
+                self.assertEqual(self.music_name().strip(), "RAW-TUNE")
+                self.assertTrue(self.tune_plays())
+
+    def test_05_font_from_disk(self):
+        v = self.v
+        pick_from_disk(self, v, "2", self.FONT_BEFORE_DISK, "raw-font")
+        self.assertEqual(v.screen_text(4)[3], "2 FONT:   RAW-FONT")
+        expected = (self.tmp / "italic.64c").read_bytes()[2:514]
+        self.assertEqual(v.peek(FONT, 512), list(expected))
+        pick_from_disk(self, v, "2", self.FONT_BEFORE_DISK, "raw-short")
+        self.assertEqual(status_line(v), "FONT TOO SHORT (512 BYTES NEEDED)")
+        self.assertEqual(v.screen_text(4)[3], "2 FONT:   RAW-FONT")
+
+
 @need_display
 class CatalogMissingTests(unittest.TestCase):
     def test_catalog_missing(self):
@@ -149,7 +241,7 @@ class CatalogMissingTests(unittest.TestCase):
             try:
                 self.assertEqual(status_line(v), "CATALOG MISSING")
                 v.key("1")
-                self.assertEqual([l.strip() for l in v.screen_text(6)[4:6]], ["NO MUSIC", ""])
+                self.assertEqual([l.strip() for l in v.screen_text(6)[4:6]], ["NO MUSIC", "FROM DISK..."])
                 v.key("Escape")
             finally:
                 v.quit()

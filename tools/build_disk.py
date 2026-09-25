@@ -27,7 +27,7 @@ REC_SIZE = 48
 NAME_LEN = 20
 FNAME_MAX = 16
 MAX_SIDS = 15
-MAX_FONTS = 14  # + 2 built-in fonts = 16 list rows (see docs/QUESTIONS.md)
+MAX_FONTS = 15
 
 DISK_NAME = "intro maker,im"
 EDITOR_FILE = "intro maker"

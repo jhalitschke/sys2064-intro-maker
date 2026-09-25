@@ -104,8 +104,10 @@
 .const CAT_PLAY          = 39
 .const CAT_SUBTUNE       = 41
 .const CAT_MAX_SIDS      = 15
-.const CAT_MAX_FONTS     = 14       // + 2 built-in fonts = 16 list rows
+.const CAT_MAX_FONTS     = 15
 .const FNAME_MAX         = 16
+.const DIR_MAX           = 144      // 1541 directory entries
+.const DIR_NAME_LEN      = 16
 .const CATALOG_FNAME_LEN = 7        // "CATALOG"
 
 // ---- KERNAL file numbers ------------------------------------------------------
@@ -114,6 +116,29 @@
 .const SA_SAVE           = 0
 .const LFN_CMD           = 15       // command / error channel
 .const SA_CMD            = 15
+.const LFN_FILE          = 2
+.const SA_READ           = 0        // load channel: "$" gives the listing
+.const ST_EOF            = $40      // READST bits
+.const ST_ERRORS         = $83      // timeouts, device not present
+
+// ---- PSID header (big endian) ------------------------------------------------
+.const PSID_DATA         = $06
+.const PSID_LOAD         = $08
+.const PSID_INIT         = $0a
+.const PSID_PLAY         = $0c
+.const PSID_START        = $10
+.const PSID_SPEED        = $12      // 32 bit
+.const PSID_NAME         = $16      // 32 bytes ASCII
+.const PSID_SPEED_BITS   = 32
+
+// ---- character codes -----------------------------------------------------------
+.const PET_QUOTE         = $22
+.const PET_P             = $50
+.const PET_R             = $52
+.const PET_G             = $47
+.const ASCII_LOWER_A     = $61
+.const ASCII_LOWER_Z     = $7a
+.const ASCII_UPPER_Z     = $5a
 
 // ---- PETSCII key codes ----------------------------------------------------
 .const KEY_RETURN        = $0d
@@ -170,14 +195,13 @@
 .const ED_EFFECT_PRESET  = 2        // effect entry index of the bar preset
 .const LIST_MUSIC        = 0
 .const LIST_FONT         = 1
+.const LIST_FILES        = 2
 .const FONT_BUILTIN_BOLD = 1        // font list: 0 ROM, 1 ROM BOLD, catalog
 .const FONT_BUILTINS     = 2
 .const ES_KEY_COUNT      = 11       // scroll text editor command keys
 .const ES_CODE_COUNT     = 4        // control codes
 .const MAX_SPEED         = 4
 .errorif UI_LIST_ROW + UI_LIST_ROWS > 20, "list must fit rows 4-19"
-.errorif 1 + CAT_MAX_SIDS > UI_LIST_ROWS, "music list too long"
-.errorif 2 + CAT_MAX_FONTS > UI_LIST_ROWS, "font list too long"
 
 // ---- Stable raster timing (BARS IRQ, see runtime/irq.asm) ------------------
 .const BARS_DELAY        = 8        // stage 2 wait loop before the $d012 compare

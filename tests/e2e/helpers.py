@@ -127,7 +127,47 @@ license = "test only"
                           "--build", str(tmp / "build"), "--out", str(d64)])
     if rc:
         raise AssertionError("build_disk failed")
+    add_raw_files(d64, tmp)
     return d64, tmp
+
+
+# raw files for the disk browser (written as they are, no catalog entry)
+DUMMIES = 12
+
+
+def raw_files(tmp: Path) -> dict[str, bytes]:
+    tune = (BUILD / "testtune.prg").read_bytes()
+    psid = psid_from_prg(tune)
+    rsid = b"RSID" + psid[4:]
+    cia = bytearray(psid)
+    cia[0x15] = 1                                   # speed bit of song 1
+    files = {f"dummy-{i:02d}": b"\x01\x08" + bytes(10) for i in range(DUMMIES)}
+    files.update({
+        "raw-psid": psid,
+        "raw-tune": tune,
+        "raw-font": (tmp / "italic.64c").read_bytes(),
+        "raw-rsid": rsid,
+        "raw-cia": bytes(cia),
+        "raw-c000": b"\x00\xc0" + tune[2:],
+        "raw-short": b"\x00\x20" + bytes(100),
+    })
+    return files
+
+
+def add_raw_files(d64: Path, tmp: Path):
+    args = ["c1541", "-attach", str(d64)]
+    for name, data in raw_files(tmp).items():
+        path = tmp / f"{name}.raw"
+        path.write_bytes(data)
+        args += ["-write", str(path), name]
+    subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def dir_index(d64: Path, name: str) -> int:
+    """Position of a PRG file in the directory list of the editor."""
+    names = [n.decode("latin1") for n, t in build_disk.read_d64_directory(d64.read_bytes())
+             if t & 7 == 2]
+    return names.index(name.upper())
 
 
 def cleanup(tmp: Path):

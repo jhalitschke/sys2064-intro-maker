@@ -7,9 +7,8 @@ handled for now.
    whole repository (code, UI texts, tool messages, docs) is English;
    `docs/SPEC.md` is an English translation of the original.
 2. **Font list > 16 entries.** The spec allows 15 catalog fonts, but the list
-   has only 16 rows (4-19) and 2 built-in fonts. `build_disk.py` therefore
-   limits fonts to 14 (`CAT_MAX_FONTS`). The alternative would be a
-   scrolling list.
+   has only 16 rows (4-19) and 2 built-in fonts. Resolved: the lists scroll,
+   15 fonts are allowed.
 3. **`$3FFF` in saved intros.** The save range ends at end of text + 1, so
    `$3FFF` is usually not part of the saved file and contains whatever the
    RAM holds after a reset. `runtime_start` therefore also clears `$3FFF`
