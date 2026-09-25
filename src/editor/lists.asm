@@ -5,21 +5,39 @@
 
 // ==== music ===================================================================
 // entries: NO MUSIC, catalog tunes, FROM DISK...
+// The list stays open: RETURN loads a tune and plays it for auditioning,
+// RUN/STOP leaves with the last loaded tune selected. The editor is silent
+// everywhere else (the preview plays the tune itself).
 ed_music:
+        lda #0
+        sta ed_music_sel
+        sta ed_music_top
+        jsr ed_status_clear
+        jsr ed_music_start          // audition the selected tune
+lm_list:
         lda #LIST_MUSIC
         sta ed_list_kind
         ldx CATALOG + CAT_N_SIDS
         inx                         // + NO MUSIC
         inx                         // + FROM DISK
         stx ed_list_n
-        jsr ed_list_run
-        bcs lm_done
+        lda ed_music_sel
+        sta ed_list_sel
+        lda ed_music_top
+        sta ed_list_top
+        jsr ed_list_resume
+        ldx ed_list_sel             // keep the position for the next round
+        stx ed_music_sel
+        ldx ed_list_top
+        stx ed_music_top
+        bcc !+
+        jmp ed_music_stop           // RUN/STOP: silent, tune stays selected
+!:      pha
+        jsr ed_status_clear
+        pla
         cmp #0
         beq lm_none
-        ldx ed_list_n
-        dex
-        stx ed_t0
-        cmp ed_t0
+        jsr le_last
         beq lm_disk
         sec
         sbc #1                      // catalog record
@@ -52,7 +70,9 @@ lm_on:
         lda cfg_flags
         ora #FLAG_MUSIC
         sta cfg_flags
-        jmp ed_music_start
+lm_play:
+        jsr ed_music_start
+        jmp lm_list
 lm_none:
         jsr ed_music_stop
         lda cfg_flags
@@ -60,17 +80,17 @@ lm_none:
         sta cfg_flags
         lda #<str_no_music
         ldy #>str_no_music
-        jmp ed_set_name_music
+        jsr ed_set_name_music
+        jmp lm_list
 lm_disk:
-        jsr ed_pick_file            // music keeps playing while browsing
-        bcs lm_done
+        jsr ed_music_stop           // silent while browsing
+        jsr ed_pick_file
+        bcs lm_play                 // cancelled: the selected tune again
         jsr disk_read_file
-        bcs lm_done                 // old tune untouched
-        jsr sid_from_buffer         // stops the music, copies to $1000
-        bcs lm_done                 // invalid file: old tune plays on
+        bcs lm_play                 // old tune untouched
+        jsr sid_from_buffer         // copies to $1000
+        bcs lm_play                 // invalid file: old tune
         jmp lm_on
-lm_done:
-        rts
 
 // ==== fonts ===================================================================
 // entries: ROM, ROM BOLD, catalog fonts, FROM DISK...
@@ -248,6 +268,8 @@ ed_list_run:
         lda #0
         sta ed_list_sel
         sta ed_list_top
+// (same with ed_list_sel / ed_list_top kept)
+ed_list_resume:
         jsr ui_clear
         ldx ed_list_kind
         lda el_head_lo,x
@@ -263,6 +285,13 @@ ed_list_run:
         lda #<str_hint_list
         ldy #>str_hint_list
         jsr ui_hint
+        Goto(0, UI_STATUS_ROW, UI_COL_STATUS)   // last message (load errors)
+        lda #<ed_status_buf
+        sta ed_str
+        lda #>ed_status_buf
+        sta ed_str + 1
+        ldx #SCREEN_COLS
+        jsr ui_putn
 el_redraw:
         jsr el_draw
 el_loop:

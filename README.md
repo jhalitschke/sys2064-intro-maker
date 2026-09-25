@@ -47,7 +47,7 @@ Main menu – press the number key:
 
 | Key | Screen | Keys inside |
 |---|---|---|
-| `1` | **MUSIC** list | CRSR up/down, RETURN loads and plays the tune, RUN/STOP back; `FROM DISK...` opens the disk directory |
+| `1` | **MUSIC** list | CRSR up/down, RETURN loads the tune and plays it for auditioning (the list stays open), RUN/STOP back with the last loaded tune; `FROM DISK...` opens the disk directory |
 | `2` | **FONT** list | CRSR up/down, RETURN loads the font, RUN/STOP back; `FROM DISK...` opens the disk directory |
 | `3` | **COLORS** | `1`–`4` step border / background / scroller / title colour |
 | `4` | **EFFECTS** | `1` raster bars, `2` bar sine, `3` bar colours (preset 1–8), `4` sprites, `5` title cycle, `6` scroll speed |
@@ -57,6 +57,10 @@ Main menu – press the number key:
 | `8` | **LINK PROGRAM** | `1` pick a PRG from disk, `2` start with RUN / SYS, `3` SYS address (hex), `4` remove |
 | `9` | **PREVIEW** | SPACE returns to the editor |
 | `0` | **SAVE** | type a file name (1–16 chars), RETURN saves, RUN/STOP cancels |
+
+**Music in the editor:** the tune only plays in the music list (to audition
+it) and in the preview; the rest of the editor is silent. The saved intro
+plays it as usual.
 
 **Loading from any disk:** swap the disk, choose `FROM DISK...` and pick a
 PRG file from the scrolling directory list. Tunes can be PSID files (copied

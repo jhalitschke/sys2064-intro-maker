@@ -374,8 +374,7 @@ ed_preview:
         sta rt_preview
         jsr runtime_start
         jsr ed_irq_install
-        jsr ui_init
-        jmp ed_music_start          // runtime restore silenced the SID
+        jmp ui_init                 // editor stays silent
 
 // $3fff = 0 and terminated text (preview and save)
 ed_prepare_intro:

@@ -19,6 +19,8 @@ ed_fname_len:   .byte 0
 ed_fname:       .fill FNAME_MAX, 0
 ed_status_buf:  .fill SCREEN_COLS, 0
 ed_list_top:    .byte 0             // first visible list entry
+ed_music_sel:   .byte 0             // music list position while auditioning
+ed_music_top:   .byte 0
 ed_dir_n:       .byte 0             // PRG files in DIR_NAMES
 ed_file_len:    .byte 0             // picked file name
 ed_file_name_buf: .fill DIR_NAME_LEN, 0

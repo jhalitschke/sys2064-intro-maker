@@ -21,6 +21,15 @@ keeps playing while browsing and a rejected file leaves the old tune intact.
 - **Big fonts**: the big font file format below.
 
 All lists scroll (16 visible rows), so the catalog allows 15 fonts again.
+Lists show the last message (e.g. a load error) in the status row.
+
+**Music only while choosing it** (replaces SPEC 7.2/7.5 "music in the
+menu"): the music list stays open after RETURN and plays the loaded tune for
+auditioning; another RETURN switches the tune, RUN/STOP leaves the list with
+the last loaded tune selected and silences it. The disk browser is silent;
+back in the list the selected tune plays again (also after a rejected file).
+The preview plays the tune through the runtime; the editor stays silent
+after it. Config and saved intro are unchanged.
 
 ## 2. Big title fonts
 

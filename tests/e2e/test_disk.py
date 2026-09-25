@@ -40,19 +40,40 @@ class DiskTests(unittest.TestCase):
         v.key("Escape")
         self.assertTrue(at_menu(v))
 
+    def tune_plays(self, v):
+        a = v.peek(TUNE_TICK + 3)[0]
+        time.sleep(0.5)
+        return v.peek(TUNE_TICK + 3)[0] != a
+
     def test_02_load_music(self):
+        """The music list stays open and plays the tune for auditioning;
+        leaving it keeps the tune selected but silent."""
         v = self.v
+        on = self.sym["ed_music_on"]
         v.key("1")
         select_entry(v, 2)                  # PSID TUNE
         v.key("Return")
-        self.assertTrue(wait_menu(v))
+        self.assertTrue(v.wait_until(lambda: v.peek(on)[0] == 1, timeout=60))
+        self.assertEqual(v.screen_text(1)[0], "MUSIC")
+        self.assertTrue(self.tune_plays(v), "music does not play in the list")
+        v.key("Escape")
+        self.assertTrue(at_menu(v))
         self.assertEqual(v.screen_text(3)[2], "1 MUSIC:  PSID TUNE")
-        self.assertEqual(v.peek(self.sym["ed_music_on"])[0], 1)
+        self.assertEqual(v.peek(on)[0], 0)
+        self.assertFalse(self.tune_plays(v), "music plays in the menu")
         self.assertEqual(v.peek(CONFIG + 3)[0] & 1, 1)
         self.assertEqual(v.peek(CONFIG + 0x0A, 5), [0x00, 0x10, 0x03, 0x10, 0])
-        a = v.peek(TUNE_TICK + 3)[0]
-        time.sleep(0.5)
-        self.assertNotEqual(v.peek(TUNE_TICK + 3)[0], a, "music does not play in the menu")
+
+    def test_02b_music_in_preview_only(self):
+        v = self.v
+        v.key("9")
+        time.sleep(1.5)
+        self.assertEqual(v.peek(0x01)[0], 0x35)
+        self.assertTrue(self.tune_plays(v), "music does not play in the preview")
+        v.key("space", hold=0.2, after=0.8)
+        self.assertTrue(at_menu(v))
+        self.assertEqual(v.peek(self.sym["ed_music_on"])[0], 0)
+        self.assertFalse(self.tune_plays(v), "music plays after the preview")
 
     def test_03_load_font(self):
         v = self.v
@@ -105,7 +126,10 @@ class DiskTests(unittest.TestCase):
         v.key("1")
         select_entry(v, 1)
         v.key("Return")
-        self.assertTrue(wait_menu(v))
+        self.assertTrue(v.wait_until(lambda: status_line(v) != "", timeout=60))
+        self.assertEqual(status_line(v), "LOAD ERROR 62, FILE NOT FOUND,00,00")
+        v.key("Escape")
+        self.assertTrue(at_menu(v))
         self.assertEqual(status_line(v), "LOAD ERROR 62, FILE NOT FOUND,00,00")
         self.assertEqual(v.screen_text(3)[2], "1 MUSIC:  NO MUSIC")
 
@@ -134,9 +158,11 @@ class DiskTests(unittest.TestCase):
             f.quit()
 
 
-def pick_from_disk(test, v, menu_key, entries_before_disk, name, menu_first=None):
+def pick_from_disk(test, v, menu_key, entries_before_disk, name, menu_first=None,
+                   back_to=None):
     """Menu key (+ key inside, e.g. TITLE STYLE -> 1) -> FROM DISK... ->
-    directory list -> file `name`. Waits for the menu unless menu_first."""
+    directory list -> file `name`. Waits for the screen `back_to` (e.g. the
+    music list, which stays open) or the menu."""
     v.key(menu_key)
     if menu_first:
         v.key(menu_first)
@@ -149,6 +175,9 @@ def pick_from_disk(test, v, menu_key, entries_before_disk, name, menu_first=None
     v.key("Return")
     if menu_first:
         test.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] != "DISK", timeout=60))
+        return
+    if back_to:
+        test.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] == back_to, timeout=60))
         return
     test.assertTrue(wait_menu(v))
 
@@ -193,29 +222,43 @@ class DiskBrowserTests(unittest.TestCase):
         reversed_rows = [r for r in range(16) if screen[r * 40] & 0x80]
         self.assertEqual(reversed_rows, [15], "selection must stay in the window")
         self.assertEqual(v.screen_text(20)[19].strip(), "RAW-PSID")
+        v.key("Escape")                     # back to the music list
+        self.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] == "MUSIC", timeout=20))
         v.key("Escape")
         self.assertTrue(at_menu(v))
 
+    def pick_tune(self, name):
+        """FROM DISK in the music list; back in the list (auditioning)."""
+        pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, name, back_to="MUSIC")
+
+    def leave_list(self):
+        self.v.key("Escape")
+        self.assertTrue(at_menu(self.v))
+        self.assertFalse(self.tune_plays(), "music plays in the menu")
+
     def test_02_psid_from_disk(self):
-        pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, "raw-psid")
+        self.pick_tune("raw-psid")
+        self.assertTrue(self.tune_plays())
+        self.leave_list()
         self.assertEqual(self.music_name().strip(), "TEST AS PSID")
         self.assertEqual(self.v.peek(CONFIG + 0x0A, 5), [0x00, 0x10, 0x03, 0x10, 0])
-        self.assertTrue(self.tune_plays())
 
     def test_03_prg_tune_from_disk(self):
-        pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, "raw-tune")
-        self.assertEqual(self.music_name().strip(), "RAW-TUNE")
+        self.pick_tune("raw-tune")
         self.assertTrue(self.tune_plays())
+        self.leave_list()
+        self.assertEqual(self.music_name().strip(), "RAW-TUNE")
 
     def test_04_rejected_tunes_keep_the_old_one(self):
         for name, message in (("raw-rsid", "RSID TUNES ARE NOT SUPPORTED"),
                               ("raw-cia", "CIA TIMED TUNES ARE NOT SUPPORTED"),
                               ("raw-c000", "TUNE MUST LOAD AT $1000")):
             with self.subTest(name=name):
-                pick_from_disk(self, self.v, "1", self.MUSIC_BEFORE_DISK, name)
-                self.assertEqual(status_line(self.v), message)
+                self.pick_tune(name)
+                self.assertEqual(status_line(self.v), message)   # shown in the list
+                self.assertTrue(self.tune_plays(), "old tune not auditioned again")
+                self.leave_list()
                 self.assertEqual(self.music_name().strip(), "RAW-TUNE")
-                self.assertTrue(self.tune_plays())
 
     def test_06_bigfont_from_catalog_and_disk(self):
         v = self.v
