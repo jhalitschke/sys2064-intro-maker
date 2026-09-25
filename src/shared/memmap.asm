@@ -28,7 +28,17 @@
 .label rt_t1             = $10
 .label rt_t2             = $11
 .label rt_t3             = $12
-.const ZP_RT_END         = $13      // first unused byte
+.label rt_ptr            = $13      // 2
+.label rt_ptr2           = $15      // 2
+.label rt_px             = $17      // 2: title x in the band
+.label rt_py             = $19      // title y in the band
+.label rt_mv_phase       = $1a
+.label rt_title_d011     = $1b      // applied in IRQ TOP
+.label rt_title_d016     = $1c
+.label rt_cur_col        = $1d      // drawn title position ($ff = none)
+.label rt_cur_row        = $1e
+.label rt_mv_tmp         = $1f
+.const ZP_RT_END         = $20      // first unused byte
 .errorif ZP_RT_END > $20, "runtime zero page overflow"
 
 // ---- Zero page: editor ($20-$3f) ------------------------------------------
@@ -83,6 +93,32 @@
 .label CHAR_ROM          = $d000    // visible with CPU_CHARROM
 .label CONFIG            = $2800
 .label CONFIG_END        = $2900
+// runtime work area behind the config block (same page, saved with it)
+.label RT_WORK           = $28b0
+.label rt_gw             = RT_WORK + $00   // glyph width/height in chars
+.label rt_gh             = RT_WORK + $01
+.label rt_mc             = RT_WORK + $02   // multicolour title
+.label rt_len            = RT_WORK + $03   // 2: glyphs per title line
+.label rt_off            = RT_WORK + $05   // 2: column offset per line
+.label rt_lines          = RT_WORK + $07
+.label rt_maxlen         = RT_WORK + $08
+.label rt_rows           = RT_WORK + $09   // text rows of the title
+.label rt_rx             = RT_WORK + $0a   // 2: x range in pixels
+.label rt_ry             = RT_WORK + $0c   // y range in pixels
+.label rt_bx             = RT_WORK + $0d   // 2: bumper x
+.label rt_bdir           = RT_WORK + $0f
+.label rt_cyc_ext        = RT_WORK + $10   // CYC_EXT_LEN colours
+.const CYC_EXT_LEN       = 56              // 16 + 40
+.label rt_frame          = RT_WORK + $48   // set by IRQ BOTTOM
+.label rt_pending        = RT_WORK + $49   // next title position ready
+.label rt_next_col       = RT_WORK + $4a
+.label rt_next_row       = RT_WORK + $4b
+.label rt_next_d011      = RT_WORK + $4c
+.label rt_next_d016      = RT_WORK + $4d
+.label rt_wchars         = RT_WORK + $4e   // title width in chars
+.label RT_WORK_END       = RT_WORK + $4f
+.errorif rt_frame < rt_cyc_ext + CYC_EXT_LEN, "runtime work area overlap"
+.errorif RT_WORK_END > CONFIG_END, "runtime work area overflow"
 .label RT_TABLES         = $2900
 .label RT_TABLES_END     = $2c00
 .label TEXT              = $2c00
@@ -99,7 +135,12 @@
 .label FILE_BUF_END      = $9000
 .label DIR_NAMES         = $9000    // DIR_MAX x 16 byte names (PETSCII)
 .label DIR_LENS          = $9900    // DIR_MAX name lengths
+.label spread_lo         = $9c00    // ROM 2X2 bit spreading tables
+.label spread_hi         = $9d00
+.label spread_lo_s       = $9e00
+.label spread_hi_s       = $9f00
 .label ED_WORK_END       = $a000    // BASIC ROM above
+
 .errorif DIR_NAMES < FILE_BUF_END, "directory table overlaps the file buffer"
 
 .errorif TEXT_MAX != 5118, "text size must be 5118"
@@ -108,10 +149,17 @@
 .errorif (RT_TABLES & $ff) != 0, "runtime tables must be page aligned"
 
 // ---- Screen layout (runtime) ----------------------------------------------
-.const TITLE_ROW         = 1
 .const TITLE_LEN         = 80
-.label TITLE_SCREEN      = SCREEN + TITLE_ROW * SCREEN_COLS
-.label TITLE_COLOR       = COLRAM + TITLE_ROW * SCREEN_COLS
+.const TITLE_LINE_LEN    = 40
+// Title band: text rows 0-8, first line 48 + YSCROLL. Moving titles use
+// YSCROLL/XSCROLL for the fine position and screen rows for the coarse one.
+.const BAND_FIRST_LINE   = $30
+.const BAND_ROWS         = 9
+.const BAND_LINES        = BAND_ROWS * 8            // 72
+.label BAND_COLOR        = COLRAM
+.const BIG_TILE_FIRST    = $40
+.label BIG_TILES         = FONT + BIG_TILE_FIRST * 8   // big title font tiles
+.const BIG_TILE_MAX      = $100 - BIG_TILE_FIRST        // 192
 .const SCROLL_ROW        = 13
 .label SCROLL_SCREEN     = SCREEN + SCROLL_ROW * SCREEN_COLS   // $0608
 .label SCROLL_COLOR      = COLRAM + SCROLL_ROW * SCREEN_COLS   // $da08
@@ -121,7 +169,10 @@
 .const PAL_LINES         = 312
 .const PAL_CYCLES        = 63
 .const IRQ_TOP_LINE      = $10
+.const IRQ_MID_LINE      = 125      // after the title band, see irq_mid
+.const MID_KEEP_YSCROLL  = 6        // title YSCROLL >= 6: row 9 still ahead
 .const IRQ_BARS_LINE     = $80
+.errorif BAND_FIRST_LINE + BAND_LINES > IRQ_MID_LINE + 1, "title band reaches the MID IRQ"
 .const IRQ_SCROLL_LINE   = $e8
 .const IRQ_BOTTOM_LINE   = $f8
 .const ED_IRQ_LINE       = $fa
@@ -139,21 +190,32 @@
 .errorif SPR_Y_MAX + SPR_HEIGHT + 1 >= IRQ_BARS_LINE - 1, "sprites reach the stable raster IRQ"
 .errorif FLD_FIRST_LINE <= IRQ_BARS_LINE + 2, "FLD must start after the double IRQ"
 
-// ---- Runtime tables ($2900-$2bff) -----------------------------------------
-.label border_buf        = RT_TABLES + $00
-.label bg_buf            = RT_TABLES + $50
-.label fld_tab           = RT_TABLES + $a0
-.label bar_sin           = RT_TABLES + $100
-.label spr_xlo           = RT_TABLES + $180
-.label spr_xhi           = RT_TABLES + $200
-.label spr_y             = RT_TABLES + $280
+// ---- Runtime tables ------------------------------------------------------
+// Saved with the intro ($2900-$2bff): the movement sine and a second code
+// segment. The other tables and the bar buffers live in RAM under the KERNAL
+// (not saved, unused by the editor and by linked programs) and are built by
+// runtime_start.
+.label mv_sin            = RT_TABLES                // signed sine, +-127
 .const SIN_LEN           = 128
+.label RT_CODE2          = RT_TABLES + SIN_LEN
+.label RT_CODE2_END      = RT_TABLES_END
+.label RT_RAM            = $e000
+.label border_buf        = RT_RAM + $00
+.label bg_buf            = RT_RAM + $50
+.label fld_tab           = RT_RAM + $a0
+.label bar_sin           = RT_RAM + $100
+.label spr_x2            = RT_RAM + $180            // sprite x / 2
+.label spr_y             = RT_RAM + $200
+.label TITLE_IMG         = RT_RAM + $280            // title drawn at row/col 0
+.const TITLE_IMG_SIZE    = BAND_ROWS * SCREEN_COLS
+.label RT_RAM_END        = TITLE_IMG + TITLE_IMG_SIZE
+.errorif (RT_RAM & $ff) != 0, "RT_RAM must be page aligned"
 .errorif (border_buf >> 8) != ((border_buf + FLD_LINES - 1) >> 8), "border_buf crosses a page"
 .errorif (bg_buf >> 8) != ((bg_buf + FLD_LINES - 1) >> 8), "bg_buf crosses a page"
 .errorif (fld_tab >> 8) != ((fld_tab + FLD_LINES - 1) >> 8), "fld_tab crosses a page"
 .errorif bg_buf < border_buf + FLD_LINES, "bar buffers overlap"
 .errorif fld_tab < bg_buf + FLD_LINES, "bar buffers overlap"
-.errorif spr_y + SIN_LEN > RT_TABLES_END, "runtime tables overflow"
+.errorif RT_RAM_END > HW_NMI_VEC, "runtime RAM tables reach the vectors"
 
 // ---- Editor variables ($6800-$6fff) ---------------------------------------
 // (laid out as a virtual segment in editor.asm)
@@ -175,6 +237,8 @@
 .label VIC_SPR_XEXP      = $d01d
 .label VIC_BORDER        = $d020
 .label VIC_BG            = $d021
+.label VIC_BG1           = $d022
+.label VIC_BG2           = $d023
 .label VIC_SPR0_COL      = $d027
 .const VIC_IRQ_RASTER    = $01
 .const VIC_IRQ_ACK_ALL   = $ff

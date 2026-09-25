@@ -11,7 +11,7 @@ import time
 import unittest
 from pathlib import Path
 
-from vice import BUILD, HAVE_XLIB, REPO, Vice
+from vice import BUILD, HAVE_XLIB, REPO, Vice, symbols
 
 sys.path.insert(0, str(REPO / "tools"))
 import build_disk  # noqa: E402
@@ -61,6 +61,18 @@ def wait_menu(v: Vice, timeout: float = 120) -> bool:
     return v.wait_until(lambda: at_menu(v), timeout=timeout)
 
 
+def select_entry(v: Vice, target: int, tries: int = 400):
+    """Move the list selection to `target` with CRSR keys, checking the
+    editor's selection after every key (keys can get lost or repeat)."""
+    addr = symbols("editor")["ed_list_sel"]
+    for _ in range(tries):
+        sel = v.peek(addr)[0]
+        if sel == target:
+            return
+        v.key("Down" if sel < target else "Up", hold=0.06, after=0.08)
+    raise AssertionError(f"list selection stuck at {sel}, wanted {target}")
+
+
 def status_line(v: Vice) -> str:
     return v.screen_text(25)[24].strip()
 
@@ -84,6 +96,27 @@ def italic_font(rom: bytes) -> bytes:
     return bytes(out)
 
 
+def big_font_2x2(rom: bytes) -> bytes:
+    """Linear 2x2 charset (64 glyphs x 4 chars) from the ROM font, pixels
+    doubled (derived at test time)."""
+    def double(b):
+        w = 0
+        for i in range(8):
+            if b & (0x80 >> i):
+                w |= 0xC000 >> (2 * i)
+        return w
+    out = bytearray()
+    for g in range(64):
+        rows = [double(rom[g * 8 + r]) for r in range(8)]
+        tall = [x for x in rows for _ in range(2)]            # 16 rows
+        for ty in range(2):
+            for tx in range(2):
+                for r in range(8):
+                    w = tall[ty * 8 + r]
+                    out.append((w >> 8) & 0xFF if tx == 0 else w & 0xFF)
+    return bytes(out)
+
+
 def psid_from_prg(prg: bytes) -> bytes:
     """Wrap a $1000 PRG tune into a PSID v2 file with load address 0."""
     hdr = b"PSID" + struct.pack(">HHHHHHHI", 2, 0x7C, 0, 0x1000, 0x1003, 1, 1, 0)
@@ -99,6 +132,7 @@ def build_test_disk() -> tuple[Path, Path]:
     if rom is None:
         raise unittest.SkipTest("no VICE chargen ROM found")
     (tmp / "italic.64c").write_bytes(b"\x00\x20" + italic_font(rom))
+    (tmp / "big.bin").write_bytes(big_font_2x2(rom))
     (tmp / "tune.sid").write_bytes(psid_from_prg((BUILD / "testtune.prg").read_bytes()))
     (tmp / "manifest.toml").write_text(f"""
 [[sid]]
@@ -119,6 +153,14 @@ license = "own work"
 name = "ITALIC ROM"
 file = "font-italic"
 src = "{tmp / 'italic.64c'}"
+license = "test only"
+
+[[bigfont]]
+name = "TEST BIG"
+file = "big-test"
+src = "{tmp / 'big.bin'}"
+width = 2
+height = 2
 license = "test only"
 """)
     d64 = tmp / "test.d64"
@@ -150,6 +192,7 @@ def raw_files(tmp: Path) -> dict[str, bytes]:
         "raw-cia": bytes(cia),
         "raw-c000": b"\x00\xc0" + tune[2:],
         "raw-short": b"\x00\x20" + bytes(100),
+        "raw-big": (tmp / "build" / "bigfonts" / "big-test.prg").read_bytes(),
     })
     return files
 

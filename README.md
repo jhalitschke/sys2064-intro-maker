@@ -23,8 +23,11 @@ in RAM (`$0801` up to the end of the scroll text), so "save" is one KERNAL
 - **Effects** (each on/off): 3 raster bars in an FLD gap with 8 colour presets,
   bar sine movement, 8 sprite balls on a sine path, title colour cycle,
   scroll speed 1/2/4.
-- **Title**: 2 × 40 characters. **Scroll text**: up to 5118 characters with
-  inline speed changes and pauses.
+- **Title**: 2 × 40 characters in the scroll font, or in a **big font**
+  (1–4 × 1–4 characters per glyph, hires or multicolour, built-in smoothed
+  ROM 2X2) – static or moving: **swing**, **sine**, horizontal **eight**,
+  **bumper**, with 4 speeds.
+- **Scroll text**: up to 5118 characters with inline speed changes and pauses.
 - **Preview** as often as you like, then **save** – the saved file starts
   with `LOAD"NAME",8` and `RUN`; SPACE resets the machine.
 - Stable raster (double IRQ, exactly 63 cycles per line), PAL only.
@@ -47,9 +50,11 @@ Main menu – press the number key:
 | `3` | **COLORS** | `1`–`4` step border / background / scroller / title colour |
 | `4` | **EFFECTS** | `1` raster bars, `2` bar sine, `3` bar colours (preset 1–8), `4` sprites, `5` title cycle, `6` scroll speed |
 | `5` | **TITLE** | overwrite mode, 80 chars in 2 rows, CRSR keys, DEL, HOME, RUN/STOP back |
-| `6` | **SCROLLTEXT** | insert mode, CRSR keys (±1 / ±40), DEL, HOME, RUN/STOP back |
-| `7` | **PREVIEW** | SPACE returns to the editor |
-| `8` | **SAVE** | type a file name (1–16 chars), RETURN saves, RUN/STOP cancels |
+| `6` | **TITLE STYLE** | `1` big font list (NONE, ROM 2X2, catalog, FROM DISK), `2` movement, `3` movement speed, `4`/`5` multicolour colours |
+| `7` | **SCROLLTEXT** | insert mode, CRSR keys (±1 / ±40), DEL, HOME, RUN/STOP back |
+| `8` | **LINK PROGRAM** | see below |
+| `9` | **PREVIEW** | SPACE returns to the editor |
+| `0` | **SAVE** | type a file name (1–16 chars), RETURN saves, RUN/STOP cancels |
 
 **Loading from any disk:** swap the disk, choose `FROM DISK...` and pick a
 PRG file from the scrolling directory list. Tunes can be PSID files (copied
@@ -57,6 +62,11 @@ to the disk as they are) or PRG files loading at `$1000` (init `$1000`, play
 `$1003`); RSID, CIA-timed and wrongly linked tunes are rejected with a message
 and the previous tune keeps playing. Fonts are PRG files with a load address
 followed by at least 512 bytes (e.g. `.64c`).
+
+**Big title fonts:** a big title line holds 40 / W glyphs (20 for 2x2).
+Big titles are centred; a static 1x1 title stays exactly as typed. Glyphs a
+font does not contain are drawn as spaces. Multicolour fonts use title
+colours 0–7 plus the two MC colours.
 
 Scroll text control codes (shown reversed in the editor):
 
@@ -118,13 +128,25 @@ file    = "font-mine"
 src     = "assets/fonts/mine.64c"  # .64c (with load address) or .bin, >= 512 bytes
 author  = "..."
 license = "..."
+
+[[bigfont]]
+name    = "MY BIG FONT"
+file    = "big-mine"
+src     = "assets/fonts/mine-2x2.64c"  # charset with W x H chars per glyph
+width   = 2
+height  = 2
+layout  = "linear"             # or "quad" (glyph g: chars g, g+64, g+128, g+192)
+multicolor = false
+author  = "..."
+license = "..."
 ```
 
 `tools/build_disk.py` validates everything and stops with a clear message:
 RSID tunes, CIA-timed tunes, `play = 0`, tunes not linked to `$1000`
 (relocate them with [sidreloc](https://www.linusakesson.net/software/sidreloc/)),
-data outside `$1000-$1FFF`, fonts under 512 bytes. Up to 15 tunes and 15 fonts
-fit into the catalog. `build/CREDITS.txt` lists name, author and license of
+data outside `$1000-$1FFF`, fonts under 512 bytes. Up to 15 tunes, 15 fonts
+and 12 big fonts fit into the catalog. Big fonts are converted to the
+format described in [docs/EXTENSIONS.md](docs/EXTENSIONS.md). `build/CREDITS.txt` lists name, author and license of
 every asset.
 
 **Licensing:** only the self-written test tune is part of this repository.
@@ -165,14 +187,18 @@ $1000  SID (max. 4 KB)              $3FFF  $00 (VIC idle byte)
 $4000  editor   $6000  catalog   $6800  editor variables
 ```
 
-The runtime uses four raster IRQs per frame: TOP (sprites, colour cycle,
-bar buffers), BARS (double IRQ for a stable raster, then an 80-line FLD loop
-of exactly 63 cycles that writes `$D020/$D021` in the horizontal blank),
-SCROLL (38 columns + x-scroll) and BOTTOM (music, scroller, SPACE). Saving
+The runtime uses five raster IRQs per frame: TOP (title fine scroll,
+sprites), MID (end of the title band), BARS (double IRQ for a stable raster,
+then an 80-line FLD loop of exactly 63 cycles that writes `$D020/$D021` in
+the horizontal blank, then the bar buffers for the next frame), SCROLL
+(38 columns + x-scroll) and BOTTOM (music, scroller, title movement, SPACE).
+The main loop redraws a moving title and runs the colour cycle. Saving
 patches the entry `JMP` to `runtime_start`, saves `$0801`–end of text and
 patches it back.
 
 Details: [docs/SPEC.md](docs/SPEC.md) (specification),
+[docs/EXTENSIONS.md](docs/EXTENSIONS.md) (disk browser, big fonts,
+movement, linker, memory map changes),
 [docs/QUESTIONS.md](docs/QUESTIONS.md) (open questions and deviations),
 [CLAUDE.md](CLAUDE.md) (notes for coding agents).
 

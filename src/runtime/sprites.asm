@@ -41,10 +41,9 @@ spr_update:
         ldx #0                      // 2 * sprite index
 su_loop:
         ldy rt_t0
-        lda spr_xlo,y
+        lda spr_x2,y
+        asl                         // x = 2 * table, bit 8 -> carry
         sta VIC_SPR0_X,x
-        lda spr_xhi,y
-        lsr                         // x bit 8 -> carry
         ror rt_msb                  // sprite 0 ends up in bit 0
         ldy rt_t1
         lda spr_y,y

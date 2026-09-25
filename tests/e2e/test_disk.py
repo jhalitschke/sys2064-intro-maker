@@ -5,7 +5,7 @@ import time
 import unittest
 
 from helpers import (OUT, at_menu, build_test_disk, cleanup, dir_index, make,
-                     need_display, start_editor, status_line, wait_menu)
+                     need_display, select_entry, start_editor, status_line, wait_menu)
 from vice import BUILD, Vice, symbols
 
 CONFIG, FONT, TEXT = 0x2800, 0x2000, 0x2C00
@@ -42,8 +42,7 @@ class DiskTests(unittest.TestCase):
     def test_02_load_music(self):
         v = self.v
         v.key("1")
-        v.key("Down")
-        v.key("Down")                       # PSID TUNE
+        select_entry(v, 2)                  # PSID TUNE
         v.key("Return")
         self.assertTrue(wait_menu(v))
         self.assertEqual(v.screen_text(3)[2], "1 MUSIC:  PSID TUNE")
@@ -57,8 +56,7 @@ class DiskTests(unittest.TestCase):
     def test_03_load_font(self):
         v = self.v
         v.key("2")
-        v.key("Down")
-        v.key("Down")
+        select_entry(v, 2)                  # ITALIC ROM
         v.key("Return")
         self.assertTrue(wait_menu(v))
         self.assertEqual(v.screen_text(4)[3], "2 FONT:   ITALIC ROM")
@@ -70,11 +68,11 @@ class DiskTests(unittest.TestCase):
         v.key("5")
         v.type("SAVED INTRO")
         v.key("Escape")
-        v.key("6")
+        v.key("7")
         v.type("HELLO FROM DISK ")
         v.key("F5")
         v.key("Escape")
-        v.key("8")
+        v.key("0")
         v.type("MYINTRO")
         v.key("Return")
         self.assertTrue(wait_menu(v))
@@ -87,7 +85,7 @@ class DiskTests(unittest.TestCase):
 
     def test_05_save_existing_name(self):
         v = self.v
-        v.key("8")
+        v.key("0")
         v.type("MYINTRO")
         v.key("Return")
         self.assertTrue(wait_menu(v))
@@ -95,16 +93,16 @@ class DiskTests(unittest.TestCase):
 
     def test_06_save_cancel(self):
         v = self.v
-        v.key("8")
+        v.key("0")
         v.type("X")
         v.key("Escape")
         self.assertTrue(at_menu(v))
 
     def test_07_load_error(self):
         v = self.v
-        v.poke(0x6002 + 21, 0x58, 0x58)    # break the name of catalog record 0
+        v.poke(0x6004 + 21, 0x58, 0x58)    # break the name of catalog record 0
         v.key("1")
-        v.key("Down")
+        select_entry(v, 1)
         v.key("Return")
         self.assertTrue(wait_menu(v))
         self.assertEqual(status_line(v), "LOAD ERROR 62, FILE NOT FOUND,00,00")
@@ -135,18 +133,22 @@ class DiskTests(unittest.TestCase):
             f.quit()
 
 
-def pick_from_disk(test, v, menu_key, entries_before_disk, name):
-    """Menu key -> FROM DISK... -> directory list -> file `name`."""
+def pick_from_disk(test, v, menu_key, entries_before_disk, name, menu_first=None):
+    """Menu key (+ key inside, e.g. TITLE STYLE -> 1) -> FROM DISK... ->
+    directory list -> file `name`. Waits for the menu unless menu_first."""
     v.key(menu_key)
-    for _ in range(entries_before_disk):
-        v.key("Down")
+    if menu_first:
+        v.key(menu_first)
+    select_entry(v, entries_before_disk)
     v.key("Return")
     test.assertTrue(v.wait_until(
         lambda: v.screen_text(24)[23].startswith("CRSR SELECT"), timeout=60),
         "directory list did not appear")
-    for _ in range(dir_index(test.d64, name)):
-        v.key("Down", hold=0.05, after=0.1)
+    select_entry(v, dir_index(test.d64, name))
     v.key("Return")
+    if menu_first:
+        test.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] != "DISK", timeout=60))
+        return
     test.assertTrue(wait_menu(v))
 
 
@@ -178,16 +180,14 @@ class DiskBrowserTests(unittest.TestCase):
     def test_01_scrolling_directory_list(self):
         v = self.v
         v.key("1")
-        for _ in range(self.MUSIC_BEFORE_DISK):
-            v.key("Down")
+        select_entry(v, self.MUSIC_BEFORE_DISK)
         self.assertEqual(v.screen_text(8)[7].strip(), "FROM DISK...")
         v.key("Return")
         self.assertTrue(v.wait_until(
             lambda: v.screen_text(24)[23].startswith("CRSR SELECT"), timeout=60))
         index = dir_index(self.d64, "raw-psid")
         self.assertGreater(index, 16, "test disk must need scrolling")
-        for _ in range(index):
-            v.key("Down", hold=0.05, after=0.1)
+        select_entry(v, index)
         screen = v.peek(0x0400 + 4 * 40, 16 * 40)
         reversed_rows = [r for r in range(16) if screen[r * 40] & 0x80]
         self.assertEqual(reversed_rows, [15], "selection must stay in the window")
@@ -215,6 +215,32 @@ class DiskBrowserTests(unittest.TestCase):
                 self.assertEqual(status_line(self.v), message)
                 self.assertEqual(self.music_name().strip(), "RAW-TUNE")
                 self.assertTrue(self.tune_plays())
+
+    def test_06_bigfont_from_catalog_and_disk(self):
+        v = self.v
+        expected = (self.tmp / "build" / "bigfonts" / "big-test.prg").read_bytes()
+        v.key("6")
+        v.key("1")
+        self.assertEqual([l.strip() for l in v.screen_text(8)[4:8]],
+                         ["NONE (1X1)", "ROM 2X2", "TEST BIG", "FROM DISK..."])
+        select_entry(v, 2)
+        v.key("Return")
+        self.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] == "TITLE STYLE", timeout=60))
+        self.assertEqual(v.screen_text(3)[2], "1 BIG FONT      TEST BIG")
+        n = expected[2 + 7]
+        self.assertEqual(v.peek(CONFIG + 0x70, 64), list(expected[2 + 8:2 + 72]))
+        self.assertEqual(v.peek(0x2200, n * 8), list(expected[2 + 72:2 + 72 + n * 8]))
+        v.key("Escape")
+        # the same file from the directory
+        pick_from_disk(self, v, "6", 3, "raw-big", menu_first="1")
+        self.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] == "TITLE STYLE", timeout=60))
+        self.assertEqual(v.screen_text(3)[2], "1 BIG FONT      RAW-BIG")
+        v.key("Escape")
+        # not a big font
+        pick_from_disk(self, v, "6", 3, "raw-tune", menu_first="1")
+        self.assertTrue(v.wait_until(lambda: v.screen_text(1)[0] == "TITLE STYLE", timeout=60))
+        v.key("Escape")
+        self.assertEqual(status_line(v), "NOT A BIG FONT FILE")
 
     def test_05_font_from_disk(self):
         v = self.v

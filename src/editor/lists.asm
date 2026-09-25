@@ -139,12 +139,15 @@ ed_copy_rec_name:
         bne !-
         rts
 
-// picked file name (ed_file_name/len) -> music / font name
+// picked file name (ed_file_name/len) -> music / font / big font name
 ed_file_name_music:
         ldx #0
         beq ed_file_name
 ed_file_name_font:
         ldx #CAT_NAME_LEN
+        bne ed_file_name
+ed_file_name_bigfont:
+        ldx #CAT_NAME_LEN * 2
 ed_file_name:
         ldy #0
 !:      lda #SC_SPACE
@@ -345,6 +348,8 @@ ed_list_entry:
         beq le_file
         cpx #LIST_FONT
         beq le_font
+        cpx #LIST_BIGFONT
+        beq le_big
         // music: NO MUSIC, catalog, FROM DISK
         cmp #0
         bne !+
@@ -372,6 +377,24 @@ le_font:
         adc CATALOG + CAT_N_SIDS
         sec
         sbc #FONT_BUILTINS
+        jmp le_record
+le_big:
+        cmp #BIG_BUILTIN_ROM2X2
+        bcc !+
+        bne !++
+        lda #<str_big_rom
+        ldy #>str_big_rom
+        jmp ui_puts
+!:      lda #<str_big_none
+        ldy #>str_big_none
+        jmp ui_puts
+!:      jsr le_last
+        beq le_disk
+        clc
+        adc CATALOG + CAT_N_SIDS
+        adc CATALOG + CAT_N_FONTS
+        sec
+        sbc #BIG_BUILTINS
 le_record:
         jsr cat_rec_addr            // keeps ed_scr/ed_colp
         lda ed_ptr
@@ -409,8 +432,8 @@ le_last:
         cmp ed_t0
         rts
 
-el_head_lo:     .byte <str_list_music, <str_list_font, <str_list_disk
-el_head_hi:     .byte >str_list_music, >str_list_font, >str_list_disk
+el_head_lo:     .byte <str_list_music, <str_list_font, <str_list_disk, <str_list_big
+el_head_hi:     .byte >str_list_music, >str_list_font, >str_list_disk, >str_list_big
 
 str_list_music: Str("MUSIC")
 str_list_font:  Str("FONT")

@@ -24,6 +24,7 @@ editor_start:
         sta VIC_IDLE_BYTE
         sta CATALOG + CAT_N_SIDS
         sta CATALOG + CAT_N_FONTS
+        sta CATALOG + CAT_N_BIGFONTS
         jsr ed_status_clear
         jsr ed_names_default
         jsr ed_irq_install
@@ -33,10 +34,13 @@ editor_start:
 ed_main:
         jsr ed_draw_menu
 !:      jsr ui_getkey
-        sec
+        cmp #KEY_0                  // "0" is the 10th entry
+        bne !+
+        lda #KEY_1 + ED_MENU_ITEMS - 1
+!:      sec
         sbc #KEY_1
         cmp #ED_MENU_ITEMS
-        bcs !-
+        bcs !--
         jsr ed_dispatch
         jmp ed_main
 
@@ -56,44 +60,58 @@ ed_menu_table:
         .word ed_colors - 1
         .word ed_effects - 1
         .word ed_title - 1
+        .word ed_title_style - 1
         .word ed_scrolltext - 1
+        .word ed_link - 1
         .word ed_preview - 1
         .word ed_save - 1
 .errorif (* - ed_menu_table) / 2 != ED_MENU_ITEMS, "menu table size"
 
 // ---- defaults ------------------------------------------------------------
 ed_config_defaults:
-        ldx #CFG_SIZE - 1
-!:      lda ed_default_cfg,x
-        sta CONFIG,x
+        ldx #CFG_SIZE               // > 128 bytes: count down to 1
+!:      lda ed_default_cfg - 1,x
+        sta CONFIG - 1,x
         dex
-        bpl !-
+        bne !-
         rts
 
 ed_default_cfg:
         .encoding "petscii_upper"
         .text "IM"
-        .byte CFG_VERSION_1, DEF_FLAGS, DEF_BORDER, DEF_BG, DEF_SCROLLCOL
+        .byte CFG_VERSION_2, DEF_FLAGS, DEF_BORDER, DEF_BG, DEF_SCROLLCOL
         .byte DEF_TITLECOL, DEF_PRESET, DEF_SPEED
         .word DEF_INIT, DEF_PLAY
         .byte DEF_SUBTUNE, 0
         .fill TITLE_LEN, SC_SPACE
+        .byte 0, 0, 0                   // 1x1 title, hires
+        .byte DEF_BIG_MC1, DEF_BIG_MC2, DEF_MOVE, DEF_MOVE_SPEED, 0
+        .word 0, 0, 0                   // no linked program
+        .fill CFG_BIG_MAP - CFG_LINK_START - 2, 0
+        .fill BIG_GLYPHS, 0
 .errorif * - ed_default_cfg != CFG_SIZE, "default config size"
 
 ed_names_default:
         lda #<str_no_music
         ldy #>str_no_music
         jsr ed_set_name_music
+        lda #<str_big_none
+        ldy #>str_big_none
+        jsr ed_set_name_bigfont
         lda #<str_font_rom
         ldy #>str_font_rom
         jmp ed_set_name_font
 
-// A/Y = STR_END string -> ed_music_name / ed_font_name (padded)
+// A/Y = STR_END string -> ed_music_name / ed_font_name /
+// ed_bigfont_name (padded)
 ed_set_name_music:
         ldx #0
         beq ed_set_name
 ed_set_name_font:
         ldx #CAT_NAME_LEN
+        bne ed_set_name
+ed_set_name_bigfont:
+        ldx #CAT_NAME_LEN * 2
 ed_set_name:
         sta ed_str
         sty ed_str + 1
@@ -132,9 +150,11 @@ ed_draw_menu:
         Print(0, UI_MENU_ROW + 2, UI_COL_TEXT, str_m_colors)
         Print(0, UI_MENU_ROW + 3, UI_COL_TEXT, str_m_effects)
         Print(0, UI_MENU_ROW + 4, UI_COL_TEXT, str_m_title)
-        Print(0, UI_MENU_ROW + 5, UI_COL_TEXT, str_m_text)
-        Print(0, UI_MENU_ROW + 6, UI_COL_TEXT, str_m_preview)
-        Print(0, UI_MENU_ROW + 7, UI_COL_TEXT, str_m_save)
+        Print(0, UI_MENU_ROW + 5, UI_COL_TEXT, str_m_style)
+        Print(0, UI_MENU_ROW + 6, UI_COL_TEXT, str_m_text)
+        Print(0, UI_MENU_ROW + 7, UI_COL_TEXT, str_m_link)
+        Print(0, UI_MENU_ROW + 8, UI_COL_TEXT, str_m_preview)
+        Print(0, UI_MENU_ROW + 9, UI_COL_TEXT, str_m_save)
         // values
         Goto(UI_VALUE_COL, UI_MENU_ROW + 0, UI_COL_KEY)
         lda #<ed_music_name
@@ -150,7 +170,15 @@ ed_draw_menu:
         sta ed_str + 1
         ldx #CAT_NAME_LEN
         jsr ui_putn
-        Goto(UI_TEXTLEN_COL, UI_MENU_ROW + 5, UI_COL_TEXT)
+        Goto(UI_VALUE_COL + 5, UI_MENU_ROW + 5, UI_COL_KEY)
+        lda #<ed_bigfont_name
+        sta ed_str
+        lda #>ed_bigfont_name
+        sta ed_str + 1
+        ldx #CAT_NAME_LEN
+        jsr ui_putn
+        jsr ed_draw_link_value
+        Goto(UI_TEXTLEN_COL, UI_MENU_ROW + 6, UI_COL_TEXT)
         lda #SC_PAREN_OPEN
         jsr ui_putc
         lda ed_text_len
@@ -377,9 +405,11 @@ str_m_font:     Str("2 FONT:")
 str_m_colors:   Str("3 COLORS")
 str_m_effects:  Str("4 EFFECTS")
 str_m_title:    Str("5 TITLE")
-str_m_text:     Str("6 SCROLLTEXT")
-str_m_preview:  Str("7 PREVIEW")
-str_m_save:     Str("8 SAVE")
+str_m_style:    Str("6 TITLE STYLE")
+str_m_text:     Str("7 SCROLLTEXT")
+str_m_link:     Str("8 LINK PROGRAM")
+str_m_preview:  Str("9 PREVIEW")
+str_m_save:     Str("0 SAVE")
 str_max_len:    Str("/5118)")
 str_colors:     Str("COLORS")
 str_c_border:   Str("1 BORDER")

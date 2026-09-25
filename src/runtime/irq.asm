@@ -1,10 +1,13 @@
 #importonce
 // ---------------------------------------------------------------------------
 // irq.asm - raster IRQ chain (KERNAL off, vector at $fffe).
-//   TOP    $10  VIC setup, sprites, title colours, bar buffers
+//   TOP    $10  VIC setup (title fine scroll), sprites
+//   MID    125  after the title band: $d011/$d016 back for the bars
 //   BARS   $80  double IRQ -> stable raster, 80 lines FLD + bars
 //   SCROLL $e8  38 columns + xscroll
-//   BOTTOM $f8  40 columns, music, scroller, SPACE check
+//   BOTTOM $f8  40 columns, music, scroller, title movement, SPACE check
+// Title drawing and colour cycle run in the main loop (runtime.asm) once
+// per frame, the bar buffers after the bar loop (interruptible).
 // ---------------------------------------------------------------------------
 
 .macro IrqEnter() {
@@ -12,6 +15,19 @@
         txa
         pha
         tya
+        pha
+}
+
+// also saves the temporaries shared with the main loop
+.macro IrqEnterT() {
+        IrqEnter()
+        lda rt_t0
+        pha
+        lda rt_t1
+        pha
+        lda rt_t2
+        pha
+        lda rt_t3
         pha
 }
 
@@ -31,10 +47,8 @@
 irq_bars:
         sta rt_bars_a + 1           // 4   self-mod save (SID play may use ZP)
         stx rt_bars_x + 1           // 4
-        sty rt_bars_y + 1           // 4
-        lda #FLD_PRE_D011           // 2   YSCROLL 4: no badline in 128-131
-        sta VIC_CTRL1               // 4
-        lda #<irq_bars_stable       // 2
+        sty rt_bars_y + 1           // 4   (MID wrote YSCROLL 4: no badline
+        lda #<irq_bars_stable       // 2    in 128-131)
         sta HW_IRQ_VEC              // 4
         lda #>irq_bars_stable       // 2
         sta HW_IRQ_VEC + 1          // 4
@@ -42,7 +56,7 @@ irq_bars:
         lda #VIC_IRQ_RASTER         // 2
         sta VIC_IRQ_FLAG            // 4
         tsx                         // 2
-        cli                         // 2 = 46 + entry (~10) -> cycle ~56
+        cli                         // 2 = 40 + entry (<= 14) -> cycle < 56
         nop                         // stage 2 hits inside the NOPs:
         nop                         // jitter reduced to 0/1 cycle
         nop
@@ -102,6 +116,10 @@ bars_loop:
         IrqNext(irq_scroll, IRQ_SCROLL_LINE)
         lda #VIC_IRQ_RASTER         // ack stage 2
         sta VIC_IRQ_FLAG
+        // bar buffers for the next frame (~2000 cycles, lines 212-245);
+        // SCROLL and BOTTOM may interrupt (they save what they use)
+        cli
+        jsr bars_prepare
 rt_bars_a:
         lda #0                      // self-mod restore
 rt_bars_x:
@@ -115,23 +133,45 @@ irq_bars_end:
 
 
 // ---- TOP -------------------------------------------------------------------
-// Budget: sprites ~350, colour cycle ~960, bar buffers ~2300 cycles
-// (+ sprite DMA from line 76). Measured in x64sc with all flags set:
-// done by raster line 76, well before BARS at $80 (128).
+// Budget: sprites ~350 cycles, done by raster line ~24.
 irq_top:
-        IrqEnter()
-        lda #RT_D016
+        IrqEnterT()
+        lda rt_title_d011           // title fine position (YSCROLL, before
+        sta VIC_CTRL1               // the first badline at 48 + YSCROLL)
+        lda rt_title_d016
         sta VIC_CTRL2
         lda #RT_D018
         sta VIC_MEMPTR
-        lda #RT_D011
-        sta VIC_CTRL1
         jsr spr_update
-        jsr cyc_update
-        jsr bars_prepare
 irq_top_done:                       // (label for timing measurements)
+        IrqNext(irq_mid, IRQ_MID_LINE)
+        jmp irq_exit_t
+
+// ---- MID -------------------------------------------------------------------
+// Exactly 10 text rows must start before the FLD gap, or the scroller does
+// not show row 13. With the title YSCROLL y the rows start at 48 + y + 8k;
+// row 9 (the 10th) at 120 + y (a badline while the previous row is still in
+// RC 7 would repeat that row instead). Line 125, after rows 0-8:
+//   y 0-5: row 9 has started (y = 5: this line) -> YSCROLL 4: no badline
+//          in 126-131 (132 on is the bar loop's job)
+//   y 6-7: keep y: row 9 starts at 126/127, the next one would be at 134
+// Title XSCROLL/multicolour end here. ~50 cycles (done by line 127 even
+// when this line is a badline).
+irq_mid:
+        pha
+        lda VIC_CTRL1
+        and #7
+        cmp #MID_KEEP_YSCROLL
+        bcs !+
+        lda #FLD_PRE_D011
+        sta VIC_CTRL1
+!:      lda #RT_D016
+        sta VIC_CTRL2
         IrqNext(irq_bars, IRQ_BARS_LINE)
-        jmp irq_exit
+        lda #VIC_IRQ_RASTER
+        sta VIC_IRQ_FLAG
+        pla
+        rti
 
 // ---- SCROLL ----------------------------------------------------------------
 // Budget: ~60 cycles (one raster line).
@@ -144,10 +184,10 @@ irq_scroll:
         jmp irq_exit
 
 // ---- BOTTOM ----------------------------------------------------------------
-// Budget: SID play (tune dependent) + scroller ~500 cycles. Measured with
-// the test tune: done by raster line 261; 80 lines are available until TOP.
+// Budget: SID play (tune dependent) + scroller ~500 + movement ~400
+// cycles. Measured with the test tune: done by raster line 261.
 irq_bottom:
-        IrqEnter()
+        IrqEnterT()
         lda #RT_D016
         sta VIC_CTRL2
         lda cfg_flags
@@ -156,6 +196,9 @@ irq_bottom:
 rt_play_call:
         jsr DEF_PLAY                // operand patched in runtime_start
 !:      jsr scroll_update
+        jsr title_update
+        lda #1
+        sta rt_frame                // main loop: work for the next frame
 irq_bottom_done:                    // (label for timing measurements)
         lda #KEY_ROW_SPACE
         sta CIA1_PRA
@@ -167,6 +210,15 @@ irq_bottom_done:                    // (label for timing measurements)
 !:      IrqNext(irq_top, IRQ_TOP_LINE)
         // fall through
 
+irq_exit_t:
+        pla
+        sta rt_t3
+        pla
+        sta rt_t2
+        pla
+        sta rt_t1
+        pla
+        sta rt_t0
 irq_exit:
         lda #VIC_IRQ_RASTER
         sta VIC_IRQ_FLAG

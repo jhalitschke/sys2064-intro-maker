@@ -17,6 +17,7 @@ runtime_start:
         lda CIA2_ICR
         lda #0
         sta rt_exit_req
+        sta rt_frame
         sta VIC_IRQ_ENABLE
         sta VIC_IDLE_BYTE           // saved intros may not contain $3fff
         lda #<irq_top
@@ -35,10 +36,12 @@ runtime_start:
         sta VIC_MEMPTR
         lda #IRQ_TOP_LINE
         sta VIC_RASTER
+        jsr rt_tables_init          // needs $01 = $35 (RAM under KERNAL)
         jsr rt_screen_init
         jsr spr_init
         jsr scroll_init
         jsr cyc_init
+        jsr title_init
         lda #0
         sta rt_bar_phase
         sta SID_VOLUME
@@ -62,8 +65,16 @@ rt_init_call:
         sta VIC_IRQ_FLAG
         cli
 
+// Main loop: per frame work (after IRQ BOTTOM). Instructions of at most 6
+// cycles keep the entry jitter of the BARS double IRQ small.
 rt_wait:
-        lda rt_exit_req             // short instructions: little IRQ jitter
+        lda rt_frame
+        beq !+
+        lda #0
+        sta rt_frame
+        jsr title_apply             // before line 48 of the next frame
+        jsr cyc_update
+!:      lda rt_exit_req
         beq rt_wait
 
         lda rt_preview
@@ -107,7 +118,7 @@ rt_leave_preview:
 rt_nmi:
         rti
 
-// clear screen, draw title, set colours
+// clear screen, set colours (the title is drawn by title_init)
 rt_screen_init:
         lda cfg_border
         sta VIC_BORDER
@@ -121,13 +132,6 @@ rt_screen_init:
         sta SCREEN + SCREEN_SIZE - $100,x
         inx
         bne !-
-        ldx #TITLE_LEN - 1
-!:      lda cfg_title,x
-        sta TITLE_SCREEN,x
-        lda cfg_titlecol
-        sta TITLE_COLOR,x
-        dex
-        bpl !-
         lda cfg_scrollcol
         ldx #SCREEN_COLS - 1
 !:      sta SCROLL_COLOR,x

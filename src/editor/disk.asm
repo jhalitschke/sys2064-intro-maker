@@ -25,10 +25,14 @@ disk_load_catalog:
         bcs !+
         lda CATALOG + CAT_N_FONTS
         cmp #CAT_MAX_FONTS + 1
+        bcs !+
+        lda CATALOG + CAT_N_BIGFONTS
+        cmp #CAT_MAX_BIGFONTS + 1
         bcc dlc_done
 !:      lda #0                      // no (valid) catalog: 0 entries
         sta CATALOG + CAT_N_SIDS
         sta CATALOG + CAT_N_FONTS
+        sta CATALOG + CAT_N_BIGFONTS
         lda #<str_catalog_missing
         ldy #>str_catalog_missing
         jsr ed_status_set

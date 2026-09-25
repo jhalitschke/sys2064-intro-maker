@@ -15,9 +15,18 @@ XVFB      := xvfb-run -a
 KFLAGS    := -odir $(ABS_BUILD)
 SRC       := $(shell find src -name '*.asm')
 
-# Optional fixture config override, e.g. make fixture FIXTURE_FLAGS=5
+# Optional fixture config overrides, e.g. make fixture FIXTURE_FLAGS=5
+# FIXTURE_MOVE=0-4 FIXTURE_SPEED=1-4 FIXTURE_BIG=1 (2x2 test font) FIXTURE_MC=1
 FIXTURE_FLAGS ?=
-FIXTURE_ARGS  := $(if $(FIXTURE_FLAGS),:flags=$(FIXTURE_FLAGS),)
+FIXTURE_MOVE  ?=
+FIXTURE_SPEED ?=
+FIXTURE_BIG   ?=
+FIXTURE_MC    ?=
+FIXTURE_ARGS  := $(if $(FIXTURE_FLAGS),:flags=$(FIXTURE_FLAGS),) \
+                 $(if $(FIXTURE_MOVE),:move=$(FIXTURE_MOVE),) \
+                 $(if $(FIXTURE_SPEED),:speed=$(FIXTURE_SPEED),) \
+                 $(if $(FIXTURE_BIG),:big=$(FIXTURE_BIG),) \
+                 $(if $(FIXTURE_MC),:mc=$(FIXTURE_MC),)
 
 VICE_SMOKE := -default -pal -warp -sounddev dummy
 

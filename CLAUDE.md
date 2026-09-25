@@ -3,7 +3,8 @@
 C64 Intro Maker: a C64 (PAL) program in KickAssembler. Editor and runtime in
 one PRG; saving writes `$0801`–end of text. The specification is
 [docs/SPEC.md](docs/SPEC.md); deviations and open points go to
-[docs/QUESTIONS.md](docs/QUESTIONS.md). User docs: [README.md](README.md).
+[docs/QUESTIONS.md](docs/QUESTIONS.md); features added after M5 are in
+[docs/EXTENSIONS.md](docs/EXTENSIONS.md). User docs: [README.md](README.md).
 
 ## Rules
 
@@ -55,6 +56,9 @@ type into whatever window has focus – they refuse to run outside
 
 ## Timing facts (verified in x64sc)
 
+- IRQ chain: TOP `$10` (title fine scroll, sprites) – MID 125 – BARS 128 –
+  SCROLL `$E8` – BOTTOM `$F8`. Title redraw and colour cycle run in the main
+  loop, the bar buffers after the bar loop inside BARS (with `cli`).
 - BARS IRQ: double IRQ at lines 128/129, FLD + colour loop covers raster
   131–210, exactly 63 cycles per iteration. The whole block must stay inside
   one page (`.errorif` in `irq.asm`) – a page-crossing branch adds a cycle
@@ -62,9 +66,15 @@ type into whatever window has focus – they refuse to run outside
 - The colour writes land in the horizontal blank (`BARS_ALIGN` in
   `config.asm`); the restore after the loop happens before the badline of
   raster 211 stalls the CPU.
-- IRQ TOP ends by raster 76 with all effects on; BOTTOM by ~261.
+- Exactly 10 text rows must start before the FLD gap or the scroller leaves
+  row 13; with a moving title (YSCROLL 0–7 in the band) `irq_mid` takes care
+  of it (see the comment there and `docs/EXTENSIONS.md`).
+- Main loop code must not use instructions longer than 6 cycles (entry
+  jitter of the double IRQ); IRQs that nest into main-loop work save
+  `rt_t0-rt_t3` (`IrqEnterT`).
 - The "grey dot" artefact of colour register writes shows where writes
   happen – useful for timing work (see `.claude/skills/raster-timing`).
+- Loops over more than 128 bytes must not use `ldx #n-1 … bpl`.
 
 ## Skills
 

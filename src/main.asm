@@ -31,8 +31,10 @@ stub_end:
 #import "runtime/bars.asm"
 #import "runtime/sprites.asm"
 #import "runtime/colorcycle.asm"
+#import "runtime/ramtables.asm"
+#import "runtime/titleinit.asm"
 #import "runtime/tables.asm"
-.errorif * > RT_CODE_END, "runtime code overflow"
+.errorif * > RT_CODE_END, "runtime code overflow, ends at $" + toHexString(*)
 
 * = SPRITE_DATA "sprite ball"
         SpriteBall()
@@ -40,7 +42,9 @@ stub_end:
 
 * = RT_TABLES
         RuntimeTables()
-.errorif * > RT_TABLES_END, "runtime tables overflow"
+* = RT_CODE2 "runtime 2"
+#import "runtime/title.asm"
+.errorif * > RT_CODE2_END, "runtime code 2 overflow, ends at $" + toHexString(*)
 
 #if FIXTURE
 // ---- Fixture: runtime test image ------------------------------------------
@@ -58,7 +62,10 @@ stub_end:
 #import "editor/textedit.asm"
 #import "editor/disk.asm"
 #import "editor/files.asm"
+#import "editor/titlestyle.asm"
+#import "editor/link.asm"
 #import "editor/fonts.asm"
+#import "editor/rom2x2.asm"
 .errorif * > EDITOR_END, "editor code overflow"
 #import "editor/vars.asm"
 #endif

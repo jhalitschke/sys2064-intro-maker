@@ -14,6 +14,7 @@ ed_list_sel:    .byte 0
 ed_list_n:      .byte 0
 ed_music_name:  .fill CAT_NAME_LEN, 0
 ed_font_name:   .fill CAT_NAME_LEN, 0
+ed_bigfont_name: .fill CAT_NAME_LEN, 0
 ed_fname_len:   .byte 0
 ed_fname:       .fill FNAME_MAX, 0
 ed_status_buf:  .fill SCREEN_COLS, 0
@@ -27,4 +28,23 @@ ed_init:        .word 0
 ed_play:        .word 0
 ed_sub:         .byte 0
 .errorif ed_font_name != ed_music_name + CAT_NAME_LEN, "name buffers must be adjacent"
+.errorif ed_bigfont_name != ed_font_name + CAT_NAME_LEN, "name buffers must be adjacent"
+// ROM 2X2 (Scale2x) scratch
+s2_glyph:       .byte 0
+s2_row:         .byte 0
+s2_p:           .byte 0
+s2_u:           .byte 0
+s2_d:           .byte 0
+s2_l:           .byte 0
+s2_r:           .byte 0
+s2_c:           .byte 0
+s2_lu:          .byte 0
+s2_ur:          .byte 0
+s2_ld:          .byte 0
+s2_dr:          .byte 0
+s2_e0:          .byte 0
+s2_e1:          .byte 0
+s2_e2:          .byte 0
+s2_e3:          .byte 0
 .errorif * > ED_VARS_END, "editor variables overflow"
+.errorif DIR_LENS + DIR_MAX > spread_lo, "directory table overlaps the spread tables"

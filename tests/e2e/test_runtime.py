@@ -10,6 +10,7 @@ from vice import BUILD, Vice, read_png, screenshot_run, symbols
 RASTER_OFFSET = 16          # screenshot y = raster line - 16 (PAL, normal borders)
 FLD_FIRST, FLD_END = 131, 211
 DISPLAY_X = range(32, 352)  # 40 column display window in the screenshot
+COLS38_X = range(40, 343)   # 38 column window (scroller area)
 FLAG_BARS, FLAG_ALL = 2, 31
 
 
@@ -31,6 +32,12 @@ def check_frame(path, border, bg=(0, 0, 0)):
             list(range(FLD_END - RASTER_OFFSET, 251 - RASTER_OFFSET)):
         if px[y][5] != border:
             issues.append(f"raster {y + RASTER_OFFSET}: border {px[y][5]}")
+    # the scroller is screen row 13 (raster 235-242); text in 243-250 means
+    # the row count before the FLD gap was wrong
+    for y in range(243 - RASTER_OFFSET, 251 - RASTER_OFFSET):
+        if any(px[y][x] != bg for x in COLS38_X):
+            issues.append(f"raster {y + RASTER_OFFSET}: scroller below row 13")
+            break
     runs = []
     for r in bar_rows:
         if runs and runs[-1][1] == r - 1:
@@ -68,6 +75,59 @@ class FlagCombinationTests(unittest.TestCase):
                     self.assertEqual(bar_rows, [])
                 if flags & 6 == FLAG_BARS:     # bars without sine: fixed 5/32/60
                     self.assertEqual(runs, [(136, 150), (163, 177), (191, 205)])
+
+
+@need_headless
+class TitleMovementTests(unittest.TestCase):
+    """1x1 and 2x2 titles with every movement and speed: the raster stays
+    clean (bars, FLD gap, scroller row 13) and the title really moves."""
+    MOVES = {0: "static", 1: "swing", 2: "sine", 3: "eight", 4: "bumper"}
+    # (x changes, y changes)
+    AXES = {0: (False, False), 1: (True, False), 2: (False, True),
+            3: (True, True), 4: (True, True)}
+
+    @classmethod
+    def tearDownClass(cls):
+        make("fixture")
+
+    def test_frames_stay_clean(self):
+        OUT.mkdir(parents=True, exist_ok=True)
+        for big in (0, 1):
+            for move in self.MOVES:
+                for speed in (1, 4):
+                    make("fixture", FIXTURE_BIG=str(big), FIXTURE_MOVE=str(move),
+                         FIXTURE_SPEED=str(speed))
+                    for cycles in (20_000_000, 20_450_000, 21_300_000):
+                        with self.subTest(big=big, move=self.MOVES[move], speed=speed,
+                                          cycles=cycles):
+                            png = OUT / f"move_b{big}_m{move}_s{speed}.png"
+                            screenshot_run(BUILD / "fixture.prg", png, cycles + speed * 1234)
+                            border = read_png(png)[2][5][5]
+                            issues, bar_rows, _ = check_frame(png, border)
+                            self.assertEqual(issues, [])
+                            self.assertGreaterEqual(len(bar_rows), 15)
+
+    @need_display
+    def test_title_moves(self):
+        for big in (0, 1):
+            for move, (dx, dy) in self.AXES.items():
+                with self.subTest(big=big, move=self.MOVES[move]):
+                    make("fixture", FIXTURE_BIG=str(big), FIXTURE_MOVE=str(move),
+                         FIXTURE_SPEED="3")
+                    v = Vice(["-autostartprgmode", "1", "-autostart",
+                              str(BUILD / "fixture.prg")])
+                    try:
+                        v.wait_until(lambda: v.peek(0x01)[0] == 0x35, timeout=30)
+                        xs, ys = set(), set()
+                        for _ in range(10):
+                            lo, hi, y = v.peek(0x17, 3)          # rt_px, rt_py
+                            xs.add(lo | hi << 8)
+                            ys.add(y)
+                            time.sleep(0.12)
+                        self.assertEqual(len(xs) > 1, dx, f"x values {sorted(xs)}")
+                        self.assertEqual(len(ys) > 1, dy, f"y values {sorted(ys)}")
+                    finally:
+                        v.quit()
 
 
 @need_display

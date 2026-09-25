@@ -23,11 +23,23 @@ FONT_ADDR = 0x2000
 FONT_SIZE = 512
 CATALOG_ADDR = 0x6000
 CATALOG_MAX = 0x0800
+CATALOG_HEADER = 4  # n_sids, n_fonts, n_bigfonts, 0
 REC_SIZE = 48
 NAME_LEN = 20
 FNAME_MAX = 16
 MAX_SIDS = 15
 MAX_FONTS = 15
+MAX_BIGFONTS = 12
+
+# big title fonts (see docs/EXTENSIONS.md)
+BIG_FILE_ADDR = 0x7000  # FILE_BUF, the editor reads the file there
+BIG_GLYPHS = 64
+BIG_TILE_MAX = 192
+BIG_SIZE_MAX = 4
+BIG_FLAG_MC = 1
+BIG_ORDER = (list(range(1, 27)) + list(range(48, 58))
+             + [33, 63, 46, 44, 45, 58, 39, 40, 41, 47, 43, 34])
+BIG_ORDER += [g for g in range(BIG_GLYPHS) if g not in BIG_ORDER]
 
 DISK_NAME = "intro maker,im"
 EDITOR_FILE = "intro maker"
@@ -53,7 +65,7 @@ class SidAsset:
 
 @dataclass
 class Entry:
-    kind: str  # "sid" or "font"
+    kind: str  # "sid", "font" or "bigfont"
     name: str
     file: str
     prg: bytes
@@ -197,6 +209,56 @@ def font_from_file(data: bytes, suffix: str) -> bytes:
     return bytes(data[:FONT_SIZE])
 
 
+def bigfont_file(charset: bytes, width: int, height: int, layout: str = "linear",
+                 first: int = 0, multicolor: bool = False, mc1: int = 11,
+                 mc2: int = 12) -> bytes:
+    """Charset with W x H chars per glyph -> big font file (PRG).
+
+    layout "linear": glyph of screen code g uses chars (g - first) * W * H ...
+    (row-major); layout "quad": char g + 64 * k (k = row * W + col, W * H <= 4).
+    Glyphs are taken in priority order (A-Z, 0-9, punctuation) while the 192
+    tile budget lasts; empty glyphs cost nothing (drawn as spaces).
+    """
+    if not (1 <= width <= BIG_SIZE_MAX and 1 <= height <= BIG_SIZE_MAX):
+        raise BuildError(f"big font size {width}x{height}: 1-{BIG_SIZE_MAX} chars each")
+    if layout not in ("linear", "quad"):
+        raise BuildError(f"big font layout {layout!r} unknown (linear, quad)")
+    per = width * height
+    if layout == "quad" and per > 4:
+        raise BuildError("layout quad supports at most 4 chars per glyph")
+    if not all(0 <= c <= 15 for c in (mc1, mc2)):
+        raise BuildError("multicolour colours must be 0-15")
+    chars = len(charset) // 8
+
+    def glyph_tiles(g: int):
+        if layout == "linear":
+            idx = [(g - first) * per + k for k in range(per)]
+        else:
+            idx = [g + 64 * k for k in range(per)]
+        if min(idx) < 0 or max(idx) >= chars:
+            return None
+        return [charset[i * 8:(i + 1) * 8] for i in idx]
+
+    glyph_map = bytearray(BIG_GLYPHS)
+    tiles = bytearray()
+    used = 0
+    for g in BIG_ORDER:
+        t = glyph_tiles(g)
+        if t is None or not any(b for tile in t for b in tile):
+            continue
+        if used + per > BIG_TILE_MAX:
+            break
+        glyph_map[g] = 0x40 + used
+        for tile in t:
+            tiles += tile
+        used += per
+    if not used:
+        raise BuildError("big font has no glyphs (charset too short or empty)")
+    header = b"BF" + bytes([width, height, BIG_FLAG_MC if multicolor else 0,
+                            mc1, mc2, used])
+    return prg(BIG_FILE_ADDR, header + bytes(glyph_map) + bytes(tiles))
+
+
 # ---------------------------------------------------------------------------
 # Catalog
 # ---------------------------------------------------------------------------
@@ -213,13 +275,17 @@ def catalog_record(e: Entry) -> bytes:
     return bytes(rec)
 
 
-def build_catalog(sids: list[Entry], fonts: list[Entry]) -> bytes:
+def build_catalog(sids: list[Entry], fonts: list[Entry],
+                  bigfonts: list[Entry] | None = None) -> bytes:
+    bigfonts = bigfonts or []
     if len(sids) > MAX_SIDS:
         raise BuildError(f"too many SIDs ({len(sids)}, max. {MAX_SIDS})")
     if len(fonts) > MAX_FONTS:
         raise BuildError(f"too many fonts ({len(fonts)}, max. {MAX_FONTS})")
-    body = bytes([len(sids), len(fonts)])
-    for e in sids + fonts:
+    if len(bigfonts) > MAX_BIGFONTS:
+        raise BuildError(f"too many big fonts ({len(bigfonts)}, max. {MAX_BIGFONTS})")
+    body = bytes([len(sids), len(fonts), len(bigfonts), 0])
+    for e in sids + fonts + bigfonts:
         body += catalog_record(e)
     if len(body) > CATALOG_MAX:
         raise BuildError("catalog too large")
@@ -236,11 +302,12 @@ def _require(item: dict, key: str, where: str):
     return item[key]
 
 
-def load_entries(manifest: dict, root: Path) -> tuple[list[Entry], list[Entry]]:
+def load_entries(manifest: dict, root: Path) -> tuple[list[Entry], list[Entry], list[Entry]]:
     sids: list[Entry] = []
     fonts: list[Entry] = []
+    bigfonts: list[Entry] = []
     seen: set[str] = set()
-    for kind in ("sid", "font"):
+    for kind in ("sid", "font", "bigfont"):
         for idx, item in enumerate(manifest.get(kind, [])):
             where = f"[[{kind}]] #{idx + 1}"
             name = _require(item, "name", where)
@@ -269,17 +336,29 @@ def load_entries(manifest: dict, root: Path) -> tuple[list[Entry], list[Entry]]:
                         raise BuildError("SID format unknown (allowed: .sid, .prg)")
                     sids.append(Entry("sid", name, file, prg(s.load, s.payload), author, lic,
                                       s.init, s.play, s.subtune))
-                else:
+                elif kind == "font":
                     f = font_from_file(data, path.suffix)
                     fonts.append(Entry("font", name, file, prg(FONT_ADDR, f), author, lic))
+                else:
+                    if path.suffix.lower() == ".64c":
+                        data = data[2:]
+                    elif path.suffix.lower() != ".bin":
+                        raise BuildError("big font format unknown (allowed: .64c, .bin)")
+                    b = bigfont_file(data, _require(item, "width", where),
+                                     _require(item, "height", where),
+                                     item.get("layout", "linear"), item.get("first", 0),
+                                     bool(item.get("multicolor", False)),
+                                     item.get("mc1", 11), item.get("mc2", 12))
+                    bigfonts.append(Entry("bigfont", name, file, b, author, lic))
             except BuildError as exc:
                 raise BuildError(f"{where}: {exc}") from None
-    return sids, fonts
+    return sids, fonts, bigfonts
 
 
-def credits_text(sids: list[Entry], fonts: list[Entry]) -> str:
+def credits_text(sids: list[Entry], fonts: list[Entry],
+                 bigfonts: list[Entry] | None = None) -> str:
     lines = ["C64 INTRO MAKER - CREDITS", ""]
-    for title, entries in (("MUSIC", sids), ("FONTS", fonts)):
+    for title, entries in (("MUSIC", sids), ("FONTS", fonts), ("BIG FONTS", bigfonts or [])):
         lines.append(title)
         if not entries:
             lines.append("  (none)")
@@ -346,24 +425,25 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with open(args.manifest, "rb") as fh:
             manifest = tomllib.load(fh)
-        sids, fonts = load_entries(manifest, Path(args.root))
-        catalog = build_catalog(sids, fonts)
+        sids, fonts, bigfonts = load_entries(manifest, Path(args.root))
+        catalog = build_catalog(sids, fonts, bigfonts)
         build.mkdir(parents=True, exist_ok=True)
-        (build / "sids").mkdir(exist_ok=True)
-        (build / "fonts").mkdir(exist_ok=True)
+        for sub in ("sids", "fonts", "bigfonts"):
+            (build / sub).mkdir(exist_ok=True)
         cat_path = build / "catalog.prg"
         cat_path.write_bytes(catalog)
         files = [(cat_path, CATALOG_FILE)]
-        for e in sids + fonts:
+        for e in sids + fonts + bigfonts:
             p = build / f"{e.kind}s" / f"{e.file}.prg"
             p.write_bytes(e.prg)
             files.append((p, c1541_filename(e.file)))
-        (build / "CREDITS.txt").write_text(credits_text(sids, fonts), encoding="utf-8")
+        (build / "CREDITS.txt").write_text(credits_text(sids, fonts, bigfonts), encoding="utf-8")
         make_disk(args.c1541, Path(args.out), Path(args.editor), files)
     except (BuildError, tomllib.TOMLDecodeError, OSError) as exc:
         print(f"build_disk: ERROR: {exc}", file=sys.stderr)
         return 1
-    print(f"build_disk: {args.out} ({len(sids)} SIDs, {len(fonts)} fonts)")
+    print(f"build_disk: {args.out} ({len(sids)} SIDs, {len(fonts)} fonts, "
+          f"{len(bigfonts)} big fonts)")
     return 0
 
 

@@ -5,3 +5,4 @@ assets/sids/*
 assets/fonts/*
 !assets/sids/.gitkeep
 !assets/fonts/.gitkeep
+assets/manifest.local.toml
