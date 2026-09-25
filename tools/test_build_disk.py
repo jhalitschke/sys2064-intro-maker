@@ -164,7 +164,7 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaises(bd.BuildError):
             bd.build_catalog([self.entry("sid", "S", f"s{i}") for i in range(16)], [])
         with self.assertRaises(bd.BuildError):
-            bd.build_catalog([], [self.entry("font", "F", f"f{i}") for i in range(15)])
+            bd.build_catalog([], [self.entry("font", "F", f"f{i}") for i in range(16)])
 
 
 class ManifestTests(unittest.TestCase):
