@@ -41,6 +41,7 @@ SID_IO_START, SID_IO_END = 0xD400, 0xD800
 
 # Regions a tune must not write to, as (start, end exclusive, label).
 FORBIDDEN = [
+    (0x0000, 0x0002, "CPU port $00-$01"),
     (0x0400, 0x0800, "screen $0400-$07ff"),
     (0x0801, 0x0FC0, "runtime code $0801-$0fbf"),
     (0x0FC0, 0x1000, "sprite data $0fc0-$0fff"),
@@ -52,6 +53,7 @@ FORBIDDEN = [
     (0xD800, 0xDC00, "colour RAM $d800-$dbff"),
     (0xDC00, 0xDD00, "CIA 1 $dc00-$dcff"),
     (0xDD00, 0xDE00, "CIA 2 $dd00-$ddff"),
+    (0xE000, 0xE400, "runtime RAM under the KERNAL $e000-$e3ff"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -131,6 +133,7 @@ class Report:
         self.jumps: list[int] = []               # JMP/JSR targets outside the tune
         self.reads: list[int] = []               # RAM reads from outside the tune
         self.reads_io: list[int] = []            # reads from VIC/CIA/colour RAM
+        self.zp_cpu: list[int] = []              # $00/$01: memory configuration
         self.zp_runtime: list[int] = []
         self.zp_editor: list[int] = []
         self.overruns: list[int] = []            # indexed writes reaching past $1fff
@@ -139,7 +142,8 @@ class Report:
 
     @property
     def clean(self) -> bool:
-        return not (self.writes or self.zp_runtime or self.jumps or self.reads)
+        return not (self.writes or self.zp_cpu or self.zp_runtime or self.jumps
+                    or self.reads)
 
     def lines(self) -> list[str]:
         out = []
@@ -156,6 +160,9 @@ class Report:
         if self.reads_io:
             out.append("reads I/O (usually harmless): "
                        + " ".join(f"${a:04x}" for a in self.reads_io))
+        if self.zp_cpu:
+            out.append("writes the CPU port (banks I/O and RAM): "
+                       + " ".join(f"${z:02x}" for z in self.zp_cpu))
         if self.zp_runtime:
             out.append("writes runtime zero page: "
                        + " ".join(f"${z:02x}" for z in self.zp_runtime))
@@ -257,6 +264,7 @@ def trace(asset: bd.SidAsset) -> Report:
             rep.reads.append(target)
 
     rep.jumps = sorted(jumps)
+    rep.zp_cpu = sorted(z for z in zp_writes if z < ZP_RT_START)
     rep.zp_runtime = sorted(z for z in zp_writes if ZP_RT_START <= z < ZP_RT_END)
     rep.zp_editor = sorted(z for z in zp_writes if ZP_ED_START <= z < ZP_ED_END)
     return rep

@@ -58,6 +58,15 @@ class CleanTests(unittest.TestCase):
 
 
 class ConflictTests(unittest.TestCase):
+    def test_cpu_port_write(self):
+        rep = report(bytes([0x85, 0x01, 0x60]), play_off=2)     # STA $01
+        self.assertEqual(rep.zp_cpu, [0x01])
+        self.assertFalse(rep.clean)
+
+    def test_runtime_ram_under_kernal(self):
+        rep = report(bytes([0x8D, 0x10, 0xE0, 0x60]), play_off=3)   # STA $e010
+        self.assertIn("runtime RAM under the KERNAL $e000-$e3ff", rep.writes)
+
     def test_font_write(self):
         rep = report(bytes([0x8D, 0x00, 0x20, 0x60]), play_off=3)
         self.assertFalse(rep.clean)

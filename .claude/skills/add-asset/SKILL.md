@@ -14,7 +14,8 @@ description: Add a SID tune or a font to the C64 Intro Maker disk via assets/man
    - `src`: path relative to the repo root
    - `license` is required, `author` recommended
    - `.prg` tunes need `init` and `play`; PSIDs take them from the header
-3. `python3 tools/check_sid.py <file>` – the header checks of
+3. `python3 tools/check_sid.py <file.sid>` (PSID files; wrap a `.prg` tune
+   into a PSID first or skip this step) – the header checks of
    `build_disk.py` only see load address, size and speed bit. This traces the
    player from init and play and reports writes, reads and JMP/JSR targets
    that leave `$1000-$1FFF`: runtime zero page, font, runtime tables, scroll
@@ -30,7 +31,8 @@ description: Add a SID tune or a font to the C64 Intro Maker disk via assets/man
      (frame-based players called once per PAL frame only)
    - data beyond `$1FFF` → the tune is larger than 4 KB
    - font shorter than 512 bytes (`.64c` without its 2-byte load address)
-5. Limits: 15 tunes, 14 fonts (list rows, see `docs/QUESTIONS.md`).
+5. Limits: 15 tunes, 15 fonts, 12 big fonts in the catalog. Files that are
+   not in the catalog can still be loaded in the editor via `FROM DISK...`.
 6. Check `build/CREDITS.txt` and, for music, listen in the editor
    (`make run`, key `1`).
 
