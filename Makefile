@@ -5,6 +5,7 @@ X64      ?= x64sc
 C1541    ?= c1541
 PYTHON   ?= python3
 EXOMIZER ?= exomizer
+MANIFEST ?= assets/manifest.toml
 
 BUILD     := build
 ABS_BUILD := $(abspath $(BUILD))
@@ -32,8 +33,8 @@ $(BUILD)/testtune.prg: assets/testtune/testtune.asm src/shared/memmap.asm | $(BU
 $(BUILD)/editor.prg: $(SRC) | $(BUILD)
 	$(KICKASS) src/main.asm $(KFLAGS) -o $(abspath $@)
 
-$(BUILD)/intromaker.d64: $(BUILD)/editor.prg $(BUILD)/testtune.prg assets/manifest.toml tools/build_disk.py
-	$(PYTHON) tools/build_disk.py --editor $(BUILD)/editor.prg --out $@ --c1541 $(C1541)
+$(BUILD)/intromaker.d64: $(BUILD)/editor.prg $(BUILD)/testtune.prg $(MANIFEST) tools/build_disk.py
+	$(PYTHON) tools/build_disk.py --manifest $(MANIFEST) --editor $(BUILD)/editor.prg --out $@ --c1541 $(C1541)
 
 fixture: $(BUILD)/testtune.prg
 	$(KICKASS) src/main.asm -define FIXTURE $(FIXTURE_ARGS) $(KFLAGS) -o $(ABS_BUILD)/fixture.prg

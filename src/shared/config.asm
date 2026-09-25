@@ -106,6 +106,14 @@
 .const CAT_MAX_SIDS      = 15
 .const CAT_MAX_FONTS     = 14       // + 2 built-in fonts = 16 list rows
 .const FNAME_MAX         = 16
+.const CATALOG_FNAME_LEN = 7        // "CATALOG"
+
+// ---- KERNAL file numbers ------------------------------------------------------
+.const LFN_DATA          = 1
+.const SA_LOAD_FILE_ADDR = 1        // LOAD to the address in the file
+.const SA_SAVE           = 0
+.const LFN_CMD           = 15       // command / error channel
+.const SA_CMD            = 15
 
 // ---- PETSCII key codes ----------------------------------------------------
 .const KEY_RETURN        = $0d
