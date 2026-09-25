@@ -171,7 +171,17 @@ them ping-pong (0 1 2 3 3 2 1 0), one step every 4 frames, with a phase
 offset of one step per sprite. Movement, colours, flag and editor entry are
 unchanged.
 
-## 7. Main menu
+## 7. Web page (GitHub Pages)
+
+CI deploys `web/index.html` (editor, `intromaker.d64`) and `web/demo.html`
+(`demo.prg`) to GitHub Pages. The emulator is EmulatorJS with the VICE x64sc
+core from the EmulatorJS CDN; the C64 ROMs come with that core and are not
+part of this repository. `demo.prg` (`make demo`) generates its ROM 2X2 title
+font at start from the machine's own character ROM, so the file contains no
+ROM data either. Direct keyboard input is enabled (`EJS_defaultOptions`).
+Saved files stay in the browser's in-memory disk image.
+
+## 8. Main menu
 
 ```
 1 MUSIC  2 FONT  3 COLORS  4 EFFECTS  5 TITLE  6 TITLE STYLE

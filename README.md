@@ -36,6 +36,11 @@ in RAM (`$0801` up to the end of the scroll text), so "save" is one KERNAL
 
 ## Quick start
 
+**In the browser:** [editor](https://jhalitschke.github.io/sys2064-intro-maker/) and
+[demo intro](https://jhalitschke.github.io/sys2064-intro-maker/demo.html)
+(VICE x64sc compiled to WebAssembly via [EmulatorJS](https://emulatorjs.org);
+loading the editor takes about a minute with the emulated 1541).
+
 1. Build the disk image (see below) or download `intromaker` from the latest
    [CI run](https://github.com/jhalitschke/sys2064-intro-maker/actions).
 2. Start `build/intromaker.d64` in VICE (`make run`) or on a real C64:
@@ -113,6 +118,7 @@ make
 |---|---|
 | `make` / `make disk` | test tune → editor → packed editor → `build/intromaker.d64` |
 | `make fixture` | runtime test image `build/fixture.prg` (all effects on); `FIXTURE_FLAGS=<0-31>` selects effects |
+| `make demo` / `make run-demo` | demo intro `build/demo.prg` for the web page (all effects, ROM 2X2 title on a figure eight, made-up crew) |
 | `make run` / `make run-fixture` | start in VICE |
 | `make test` | unit tests of the build tools |
 | `make smoke` | screenshots `build/fixture.png` and `build/editor.png` |

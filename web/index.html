@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C64 Intro Maker</title>
+<style>
+  :root { --bg: #1b1b2f; --fg: #e8e8f0; --muted: #a0a0b8; --accent: #7c71da; --panel: #25253f; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.6rem; margin: 0.4em 0; }
+  nav a, a { color: var(--accent); }
+  nav { margin-bottom: 12px; }
+  nav a { margin-right: 1em; }
+  #screen { width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 6px; overflow: hidden; }
+  table { border-collapse: collapse; margin: 12px 0; }
+  td, th { padding: 4px 10px; border-bottom: 1px solid var(--panel); text-align: left; }
+  .muted { color: var(--muted); font-size: 0.9rem; }
+  kbd { background: var(--panel); border-radius: 4px; padding: 1px 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>C64 Intro Maker</h1>
+  <nav><a href="index.html">Editor</a><a href="demo.html">Runtime demo</a>
+       <a href="https://github.com/jhalitschke/sys2064-intro-maker">Source</a></nav>
+  <div id="screen"><div id="game"></div></div>
+  <p>The editor runs from <code>intromaker.d64</code> in VICE (x64sc) compiled to
+  WebAssembly, with 1541 drive emulation. Click into the screen first.</p>
+  <table>
+    <tr><th>C64</th><th>PC keyboard</th></tr>
+    <tr><td>RUN/STOP</td><td><kbd>Esc</kbd></td></tr>
+    <tr><td>F1 / F3 / F5 / F7</td><td><kbd>F1</kbd> <kbd>F3</kbd> <kbd>F5</kbd> <kbd>F7</kbd></td></tr>
+    <tr><td>CRSR / HOME / DEL</td><td>arrow keys, <kbd>Home</kbd>, <kbd>Backspace</kbd></td></tr>
+    <tr><td>RETURN / SPACE</td><td><kbd>Enter</kbd>, <kbd>Space</kbd></td></tr>
+  </table>
+  <p class="muted">Saving writes to the disk image in the browser memory; it is lost when the
+  page is closed. The emulator core and the C64 ROMs it contains are loaded from the
+  <a href="https://emulatorjs.org">EmulatorJS</a> CDN (VICE, GPL); they are not part of this
+  repository.</p>
+</main>
+<script>
+  EJS_player = '#game';
+  EJS_core = 'vice_x64sc';
+  EJS_gameUrl = 'intromaker.d64';
+  EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+  EJS_startOnLoaded = true;
+  // the C64 keyboard instead of a virtual gamepad; warp while loading
+  EJS_defaultOptions = { keyboardInput: 'enabled', vice_autoloadwarp: 'enabled' };
+</script>
+<script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
+</body>
+</html>

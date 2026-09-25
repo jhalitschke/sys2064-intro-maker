@@ -30,7 +30,7 @@ FIXTURE_ARGS  := $(if $(FIXTURE_FLAGS),:flags=$(FIXTURE_FLAGS),) \
 
 VICE_SMOKE := -default -pal -warp -sounddev dummy
 
-.PHONY: all disk fixture run run-fixture test smoke e2e clean
+.PHONY: all disk fixture demo run run-fixture run-demo test smoke e2e clean
 
 all: disk
 disk: $(BUILD)/intromaker.d64
@@ -56,8 +56,16 @@ fixture: $(BUILD)/testtune.prg
 	$(KICKASS) src/main.asm -define FIXTURE $(FIXTURE_ARGS) $(KFLAGS) -o $(ABS_BUILD)/fixture.prg
 	cp $(BUILD)/main.sym $(BUILD)/fixture.sym
 
+# demo intro for the web page: all effects, ROM 2X2 title on a figure eight
+demo: $(BUILD)/testtune.prg
+	$(KICKASS) src/main.asm -define FIXTURE -define DEMO $(KFLAGS) -o $(ABS_BUILD)/demo.prg
+	cp $(BUILD)/main.sym $(BUILD)/demo.sym
+
 run: disk
 	$(X64) -autostart $(BUILD)/intromaker.d64
+
+run-demo: demo
+	$(X64) -autostartprgmode 1 -autostart $(BUILD)/demo.prg
 
 run-fixture: fixture
 	$(X64) -autostartprgmode 1 -autostart $(BUILD)/fixture.prg

@@ -51,7 +51,11 @@ stub_end:
 
 #if FIXTURE
 // ---- Fixture: runtime test image ------------------------------------------
+#if DEMO
+#import "demo.asm"
+#else
 #import "fixture.asm"
+#endif
 #else
 // ---- Editor -----------------------------------------------------------------
 * = TEXT "scroll text"

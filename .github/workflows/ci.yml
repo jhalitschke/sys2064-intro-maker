@@ -42,8 +42,19 @@ jobs:
       - name: Unit tests
         run: make test
 
-      - name: Build disk and fixture
-        run: make disk fixture
+      - name: Build disk, fixture and web demo
+        run: make disk fixture demo
+
+      - name: Assemble the web page
+        run: |
+          mkdir -p site
+          cp web/*.html site/
+          cp build/intromaker.d64 build/demo.prg site/
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: site
 
       - uses: actions/upload-artifact@v4
         with:
@@ -53,3 +64,18 @@ jobs:
             build/editor.prg
             build/fixture.prg
             build/CREDITS.txt
+
+  pages:
+    # the editor and a demo intro in the browser (EmulatorJS, VICE x64sc core)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
