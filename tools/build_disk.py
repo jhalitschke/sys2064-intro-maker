@@ -77,7 +77,7 @@ def name_to_screencodes(name: str) -> bytes:
     up = name.upper()
     if not NAME_RE.match(up):
         raise BuildError(
-            f"Name {name!r}: max. {NAME_LEN} Zeichen aus A-Z 0-9 Leerzeichen . , ! ? - : / ( )")
+            f"name {name!r}: max. {NAME_LEN} chars from A-Z 0-9 space . , ! ? - : / ( )")
     out = bytearray()
     for ch in up:
         c = ord(ch)
@@ -88,13 +88,13 @@ def name_to_screencodes(name: str) -> bytes:
         elif 0x20 <= c <= 0x3F:
             out.append(c)
         else:  # unreachable because of NAME_RE
-            raise BuildError(f"Name {name!r}: Zeichen {ch!r} nicht erlaubt")
+            raise BuildError(f"name {name!r}: character {ch!r} not allowed")
     return bytes(out.ljust(NAME_LEN, b"\x20"))
 
 
 def validate_file(file: str) -> None:
     if not FILE_RE.match(file):
-        raise BuildError(f"Dateiname {file!r}: nur a-z 0-9 -, max. {FNAME_MAX} Zeichen, klein geschrieben")
+        raise BuildError(f"file name {file!r}: only a-z 0-9 -, max. {FNAME_MAX} chars, lower case")
 
 
 def catalog_filename(file: str) -> bytes:
@@ -115,7 +115,7 @@ def c1541_filename(file: str) -> str:
 
 def parse_psid(data: bytes) -> dict:
     if len(data) < 0x76:
-        raise BuildError("SID-Datei zu kurz fuer einen PSID-Header")
+        raise BuildError("SID file too short for a PSID header")
     magic = data[0:4]
     (version, data_offset, load, init, play, songs, start_song, speed) = struct.unpack(
         ">HHHHHHHI", data[4:22])
@@ -129,32 +129,32 @@ def parse_psid(data: bytes) -> dict:
 def check_sid_range(load: int, payload: bytes, init: int, play: int) -> None:
     if load != SID_START:
         raise BuildError(
-            f"Tune ist auf ${load:04X} gelinkt, erwartet ${SID_START:04X}. "
-            "Bitte mit sidreloc nach $1000 verschieben.")
+            f"tune is linked to ${load:04X}, expected ${SID_START:04X}. "
+            "Please relocate it to $1000 with sidreloc.")
     end = load + len(payload)
     if not payload or end > SID_END:
         raise BuildError(
-            f"SID-Daten ${load:04X}-${end - 1:04X} liegen ausserhalb $1000-$1FFF (max. 4 KB)")
+            f"SID data ${load:04X}-${end - 1:04X} outside $1000-$1FFF (max. 4 KB)")
     if play == 0:
-        raise BuildError("play = 0 wird nicht unterstuetzt (nur Frame-Player)")
+        raise BuildError("play = 0 is not supported (frame based players only)")
     for label, addr in (("init", init), ("play", play)):
         if not load <= addr < end:
-            raise BuildError(f"{label}-Adresse ${addr:04X} liegt ausserhalb der Daten")
+            raise BuildError(f"{label} address ${addr:04X} outside the data")
 
 
 def sid_from_psid(data: bytes, subtune: int | None = None) -> SidAsset:
     h = parse_psid(data)
     if h["magic"] == b"RSID":
-        raise BuildError("RSID-Tunes werden nicht unterstuetzt (brauchen echte CIA/KERNAL-Umgebung)")
+        raise BuildError("RSID tunes are not supported (they need a real CIA/KERNAL environment)")
     if h["magic"] != b"PSID":
-        raise BuildError("keine PSID-Datei")
+        raise BuildError("not a PSID file")
     if h["play"] == 0:
-        raise BuildError("play = 0 wird nicht unterstuetzt (nur Frame-Player)")
+        raise BuildError("play = 0 is not supported (frame based players only)")
     body = data[h["data_offset"]:]
     load = h["load"]
     if load == 0:
         if len(body) < 2:
-            raise BuildError("SID-Daten zu kurz")
+            raise BuildError("SID data too short")
         load = body[0] | (body[1] << 8)
         body = body[2:]
     init = h["init"] or load
@@ -162,23 +162,23 @@ def sid_from_psid(data: bytes, subtune: int | None = None) -> SidAsset:
     if subtune is None:
         subtune = max(h["start_song"], 1) - 1
     if not 0 <= subtune < songs:
-        raise BuildError(f"Subtune {subtune} ungueltig (Tune hat {songs} Songs)")
+        raise BuildError(f"subtune {subtune} invalid (tune has {songs} songs)")
     if h["speed"] & (1 << min(subtune, 31)):
-        raise BuildError("Speed-Bit gesetzt (CIA-Timing) wird nicht unterstuetzt")
+        raise BuildError("speed bit set (CIA timing) is not supported")
     check_sid_range(load, body, init, h["play"])
     return SidAsset(load, bytes(body), init, h["play"], subtune, songs)
 
 
 def sid_from_prg(data: bytes, init: int | None, play: int | None, subtune: int = 0) -> SidAsset:
     if init is None or play is None:
-        raise BuildError(".prg-SIDs brauchen init und play im Manifest")
+        raise BuildError(".prg SIDs need init and play in the manifest")
     if len(data) < 3:
-        raise BuildError("PRG zu kurz")
+        raise BuildError("PRG too short")
     load = data[0] | (data[1] << 8)
     body = data[2:]
     check_sid_range(load, body, init, play)
     if not 0 <= subtune <= 0xFF:
-        raise BuildError(f"Subtune {subtune} ungueltig")
+        raise BuildError(f"subtune {subtune} invalid")
     return SidAsset(load, bytes(body), init, play, subtune)
 
 
@@ -191,9 +191,9 @@ def font_from_file(data: bytes, suffix: str) -> bytes:
     if suffix == ".64c":
         data = data[2:]
     elif suffix != ".bin":
-        raise BuildError(f"Font-Format {suffix!r} unbekannt (erlaubt: .64c, .bin)")
+        raise BuildError(f"font format {suffix!r} unknown (allowed: .64c, .bin)")
     if len(data) < FONT_SIZE:
-        raise BuildError(f"Font hat nur {len(data)} Bytes, gebraucht werden {FONT_SIZE}")
+        raise BuildError(f"font has only {len(data)} bytes, {FONT_SIZE} are needed")
     return bytes(data[:FONT_SIZE])
 
 
@@ -215,14 +215,14 @@ def catalog_record(e: Entry) -> bytes:
 
 def build_catalog(sids: list[Entry], fonts: list[Entry]) -> bytes:
     if len(sids) > MAX_SIDS:
-        raise BuildError(f"zu viele SIDs ({len(sids)}, max. {MAX_SIDS})")
+        raise BuildError(f"too many SIDs ({len(sids)}, max. {MAX_SIDS})")
     if len(fonts) > MAX_FONTS:
-        raise BuildError(f"zu viele Fonts ({len(fonts)}, max. {MAX_FONTS})")
+        raise BuildError(f"too many fonts ({len(fonts)}, max. {MAX_FONTS})")
     body = bytes([len(sids), len(fonts)])
     for e in sids + fonts:
         body += catalog_record(e)
     if len(body) > CATALOG_MAX:
-        raise BuildError("Katalog zu gross")
+        raise BuildError("catalog too large")
     return prg(CATALOG_ADDR, body)
 
 
@@ -232,7 +232,7 @@ def build_catalog(sids: list[Entry], fonts: list[Entry]) -> bytes:
 
 def _require(item: dict, key: str, where: str):
     if key not in item or item[key] in ("", None):
-        raise BuildError(f"{where}: Pflichtfeld {key!r} fehlt")
+        raise BuildError(f"{where}: required field {key!r} missing")
     return item[key]
 
 
@@ -247,17 +247,17 @@ def load_entries(manifest: dict, root: Path) -> tuple[list[Entry], list[Entry]]:
             file = _require(item, "file", where)
             src = _require(item, "src", where)
             lic = _require(item, "license", where)
-            author = item.get("author", "unbekannt")
+            author = item.get("author", "unknown")
             where = f"{where} ({name})"
             try:
                 name_to_screencodes(name)
                 validate_file(file)
                 if file in seen or file in (CATALOG_FILE, EDITOR_FILE):
-                    raise BuildError(f"Dateiname {file!r} doppelt vergeben")
+                    raise BuildError(f"file name {file!r} used twice")
                 seen.add(file)
                 path = root / src
                 if not path.is_file():
-                    raise BuildError(f"Quelldatei {src} nicht gefunden")
+                    raise BuildError(f"source file {src} not found")
                 data = path.read_bytes()
                 if kind == "sid":
                     sub = item.get("subtune")
@@ -266,7 +266,7 @@ def load_entries(manifest: dict, root: Path) -> tuple[list[Entry], list[Entry]]:
                     elif path.suffix.lower() == ".prg":
                         s = sid_from_prg(data, item.get("init"), item.get("play"), sub or 0)
                     else:
-                        raise BuildError("SID-Format unbekannt (erlaubt: .sid, .prg)")
+                        raise BuildError("SID format unknown (allowed: .sid, .prg)")
                     sids.append(Entry("sid", name, file, prg(s.load, s.payload), author, lic,
                                       s.init, s.play, s.subtune))
                 else:
@@ -279,12 +279,12 @@ def load_entries(manifest: dict, root: Path) -> tuple[list[Entry], list[Entry]]:
 
 def credits_text(sids: list[Entry], fonts: list[Entry]) -> str:
     lines = ["C64 INTRO MAKER - CREDITS", ""]
-    for title, entries in (("MUSIK", sids), ("FONTS", fonts)):
+    for title, entries in (("MUSIC", sids), ("FONTS", fonts)):
         lines.append(title)
         if not entries:
-            lines.append("  (keine)")
+            lines.append("  (none)")
         for e in entries:
-            lines.append(f"  {e.name.upper():<20}  {e.author}  |  Lizenz: {e.license}")
+            lines.append(f"  {e.name.upper():<20}  {e.author}  |  license: {e.license}")
         lines.append("")
     return "\n".join(lines)
 
@@ -325,11 +325,11 @@ def make_disk(c1541: str, out: Path, editor: Path, files: list[tuple[Path, str]]
         cmd += ["-write", str(path), name]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0 or not out.exists():
-        raise BuildError(f"c1541 fehlgeschlagen:\n{res.stdout}{res.stderr}")
+        raise BuildError(f"c1541 failed:\n{res.stdout}{res.stderr}")
     names = [n for n, _ in read_d64_directory(out.read_bytes())]
     expected = [EDITOR_FILE.upper().encode()] + [n.upper().encode() for _, n in files]
     if names != expected:
-        raise BuildError(f"D64-Verzeichnis unerwartet: {names} statt {expected}")
+        raise BuildError(f"unexpected D64 directory: {names} instead of {expected}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -361,9 +361,9 @@ def main(argv: list[str] | None = None) -> int:
         (build / "CREDITS.txt").write_text(credits_text(sids, fonts), encoding="utf-8")
         make_disk(args.c1541, Path(args.out), Path(args.editor), files)
     except (BuildError, tomllib.TOMLDecodeError, OSError) as exc:
-        print(f"build_disk: FEHLER: {exc}", file=sys.stderr)
+        print(f"build_disk: ERROR: {exc}", file=sys.stderr)
         return 1
-    print(f"build_disk: {args.out} ({len(sids)} SIDs, {len(fonts)} Fonts)")
+    print(f"build_disk: {args.out} ({len(sids)} SIDs, {len(fonts)} fonts)")
     return 0
 
 

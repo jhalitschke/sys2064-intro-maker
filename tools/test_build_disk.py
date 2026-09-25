@@ -53,7 +53,7 @@ class PsidTests(unittest.TestCase):
             bd.sid_from_psid(make_psid(play=0))
 
     def test_rejects_speed_bit(self):
-        with self.assertRaisesRegex(bd.BuildError, "Speed"):
+        with self.assertRaisesRegex(bd.BuildError, "speed bit"):
             bd.sid_from_psid(make_psid(speed=1))
         # speed bit of another subtune is fine
         bd.sid_from_psid(make_psid(songs=2, start=1, speed=2))
@@ -63,7 +63,7 @@ class PsidTests(unittest.TestCase):
             bd.sid_from_psid(make_psid(load=0x0c00, init=0x0c00, play=0x0c03))
 
     def test_rejects_data_beyond_1fff(self):
-        with self.assertRaisesRegex(bd.BuildError, "ausserhalb"):
+        with self.assertRaisesRegex(bd.BuildError, "outside"):
             bd.sid_from_psid(make_psid(payload=b"\x60" * 0x1001))
 
     def test_accepts_exactly_4k(self):
@@ -82,7 +82,7 @@ class PsidTests(unittest.TestCase):
     def test_prg_sid(self):
         s = bd.sid_from_prg(b"\x00\x10" + b"\x60" * 8, 0x1000, 0x1003)
         self.assertEqual((s.load, s.init, s.play), (0x1000, 0x1000, 0x1003))
-        with self.assertRaisesRegex(bd.BuildError, "init und play"):
+        with self.assertRaisesRegex(bd.BuildError, "init and play"):
             bd.sid_from_prg(b"\x00\x10\x60", None, 0x1003)
         with self.assertRaisesRegex(bd.BuildError, "sidreloc"):
             bd.sid_from_prg(b"\x00\x20\x60", 0x2000, 0x2000)
@@ -116,7 +116,7 @@ class NameTests(unittest.TestCase):
         bd.name_to_screencodes(".,!?-:/()")
 
     def test_rejects_invalid(self):
-        for bad in ("", "X" * 21, "UMLAUT Ä", "A_B", "A@B"):
+        for bad in ("", "X" * 21, "UMLAUT \u00c4", "A_B", "A@B"):
             with self.assertRaises(bd.BuildError, msg=bad):
                 bd.name_to_screencodes(bad)
 
@@ -188,7 +188,7 @@ class ManifestTests(unittest.TestCase):
     def test_duplicate_file(self):
         (self.tmp / "f.bin").write_bytes(bytes(512))
         f = {"name": "F", "file": "f", "src": "f.bin", "license": "x"}
-        with self.assertRaisesRegex(bd.BuildError, "doppelt"):
+        with self.assertRaisesRegex(bd.BuildError, "used twice"):
             bd.load_entries({"font": [f, dict(f)]}, self.tmp)
 
     def test_font_prg_has_load_address_2000(self):

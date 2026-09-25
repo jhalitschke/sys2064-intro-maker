@@ -1,71 +1,75 @@
-# C64 Intro Maker – Spezifikation & Bauanleitung (für Claude Code)
+# C64 Intro Maker – Specification & Build Guide (for Claude Code)
 
-Ziel: ein C64-Programm (PAL), das **auf dem C64 selbst** läuft. Der Nutzer wählt Musik (SID), Font, Farben und Effekte, gibt Titel und Scrolltext ein, sieht eine Vorschau und speichert das Ergebnis als **eigenständig startbares PRG** auf Diskette.
+Goal: a C64 program (PAL) that runs **on the C64 itself**. The user picks music (SID), font, colours and effects, enters a title and a scroll text, watches a preview and saves the result to disk as a **standalone, runnable PRG**.
 
-Grundidee: Editor und Runtime stecken in einem PRG. Das fertige Intro liegt jederzeit komplett im RAM (`$0801`–Textende). „Speichern“ ist ein einziger KERNAL-`SAVE` dieses Bereichs. Es gibt keinen Linker und keine Relocation auf dem C64.
+Core idea: editor and runtime live in one PRG. The finished intro is always completely in RAM (`$0801`–end of text). "Save" is a single KERNAL `SAVE` of that range. There is no linker and no relocation on the C64.
+
+> This is the English translation of the original German specification. The
+> only intended change is the language of the UI texts (English instead of
+> German). Deviations and open questions are tracked in `docs/QUESTIONS.md`.
 
 ---
 
-## 0. Arbeitsregeln für Claude Code
+## 0. Working rules for Claude Code
 
-- Setze die Meilensteine aus Abschnitt 10 **der Reihe nach** um. Nach jedem Meilenstein: `make`, `make test`, `make smoke`, die Screenshots ansehen und mit `M<n>: <Kurzbeschreibung>` committen.
-- Baue nur, was hier steht (YAGNI). Wenn etwas unklar ist, notiere es als offene Frage im Commit-Text oder in `docs/QUESTIONS.md`, statt Features zu erfinden.
-- Alle Adressen und Konstanten stehen ausschließlich in `src/shared/memmap.asm` und `src/shared/config.asm`. Anderswo gibt es keine Magic Numbers.
-- Sichere jede Speichergrenze mit `.errorif` in KickAssembler ab.
-- Kommentiere zeitkritischen Code mit Zyklen pro Befehl und der Summe pro Rasterzeile.
-- Python ≥ 3.11 mit **nur der Standardbibliothek** (`tomllib`, `struct`, `subprocess`, `unittest`).
-- **Keine fremden SIDs oder Fonts committen.** Im Repo liegt nur die selbst geschriebene Testmelodie. Nutzer-Assets kommen mit Lizenzangabe ins Manifest.
-- Nur PAL (312 Rasterzeilen, 63 Zyklen/Zeile). NTSC ist out of scope.
-- UI-Texte auf Deutsch, in Großbuchstaben, ohne Umlaute (AE/OE/UE). Code-Kommentare kurz und auf Englisch.
+- Implement the milestones from section 10 **in order**. After each milestone: `make`, `make test`, `make smoke`, look at the screenshots and commit as `M<n>: <short description>`.
+- Build only what is written here (YAGNI). If something is unclear, write it down as an open question in the commit message or in `docs/QUESTIONS.md` instead of inventing features.
+- All addresses and constants live exclusively in `src/shared/memmap.asm` and `src/shared/config.asm`. No magic numbers anywhere else.
+- Guard every memory boundary with `.errorif` in KickAssembler.
+- Comment timing-critical code with cycles per instruction and the sum per raster line.
+- Python ≥ 3.11 with **the standard library only** (`tomllib`, `struct`, `subprocess`, `unittest`).
+- **Never commit third-party SIDs or fonts.** The repo contains only the self-written test tune. User assets go into the manifest with license information.
+- PAL only (312 raster lines, 63 cycles/line). NTSC is out of scope.
+- UI texts in English, upper case. Code comments short and in English.
 
 ---
 
 ## 1. Toolchain
 
-| Tool | Zweck | Makefile-Variable |
+| Tool | Purpose | Makefile variable |
 |---|---|---|
-| KickAssembler (Java) | Assembler | `KICKASS ?= kickass` (Wrapper oder `java -jar …/KickAss.jar`) |
-| VICE `x64sc` | Emulator, Smoke-Tests | `X64 ?= x64sc` |
-| VICE `c1541` | D64 erzeugen | `C1541 ?= c1541` |
-| Python 3.11+ | Asset-/Katalog-/Disk-Build | `PYTHON ?= python3` |
-| Exomizer | nur M5: Editor-PRG packen | `EXOMIZER ?= exomizer` |
+| KickAssembler (Java) | assembler | `KICKASS ?= kickass` (wrapper or `java -jar …/KickAss.jar`) |
+| VICE `x64sc` | emulator, smoke tests | `X64 ?= x64sc` |
+| VICE `c1541` | create the D64 | `C1541 ?= c1541` |
+| Python 3.11+ | asset/catalog/disk build | `PYTHON ?= python3` |
+| Exomizer | M5 only: pack the editor PRG | `EXOMIZER ?= exomizer` |
 
-Headless-Umgebung: `x64sc` über `xvfb-run -a` starten, falls kein Display vorhanden ist.
+Headless environments: start `x64sc` via `xvfb-run -a` if there is no display.
 
 ---
 
-## 2. Repo-Struktur
+## 2. Repo layout
 
 ```
 Makefile
 README.md
-docs/SPEC.md                  # diese Datei
+docs/SPEC.md                  # this file
 src/
-  main.asm                    # Stub, Entry-JMP, Imports; -define FIXTURE für Testbuild
+  main.asm                    # stub, entry JMP, imports; -define FIXTURE for the test build
   shared/
-    memmap.asm                # ALLE Adressen, Grenzen, .errorif
-    config.asm                # Config-Block-Layout, Flags, Defaults
+    memmap.asm                # ALL addresses, boundaries, .errorif
+    config.asm                # config block layout, flags, defaults
   runtime/
-    runtime.asm               # runtime_start, Init, Restore, Exit
-    irq.asm                   # IRQ-Kette, Double-IRQ (stabiler Raster)
+    runtime.asm               # runtime_start, init, restore, exit
+    irq.asm                   # IRQ chain, double IRQ (stable raster)
     scroller.asm
-    bars.asm                  # Rasterbars + FLD
+    bars.asm                  # raster bars + FLD
     sprites.asm
     colorcycle.asm
-    tables.asm                # per Assembler generierte Tabellen
+    tables.asm                # tables generated by the assembler
   editor/
-    editor.asm                # Start, Hauptmenü-Loop
-    ui.asm                    # Print-Routinen (direkt in Screen-RAM)
-    lists.asm                 # Auswahllisten (Musik, Font)
-    textedit.asm              # Titel- und Scrolltext-Editor
-    disk.asm                  # LOAD, SAVE, Laufwerksstatus
-    fonts.asm                 # ROM-Font kopieren, fett
-    irq.asm                   # Editor-IRQ (Musik + KERNAL-Tastatur)
+    editor.asm                # start, main menu loop
+    ui.asm                    # print routines (directly into screen RAM)
+    lists.asm                 # selection lists (music, font)
+    textedit.asm              # title and scroll text editor
+    disk.asm                  # LOAD, SAVE, drive status
+    fonts.asm                 # copy ROM font, bold
+    irq.asm                   # editor IRQ (music + KERNAL keyboard)
 assets/
   manifest.toml
-  sids/                       # Nutzer-Assets (.sid / .prg), nicht committen außer Test
-  fonts/                      # Nutzer-Assets (.64c / .bin)
-  testtune/testtune.asm       # eigene Testmelodie
+  sids/                       # user assets (.sid / .prg), not committed except the test tune
+  fonts/                      # user assets (.64c / .bin)
+  testtune/testtune.asm       # own test tune
 tools/
   build_disk.py
   test_build_disk.py
@@ -74,295 +78,295 @@ build/                        # gitignored
 
 ---
 
-## 3. Programmfluss
+## 3. Program flow
 
-1. `LOAD"*",8` + `RUN` → BASIC-Stub `SYS 2064` → `$0810: JMP editor_start`
-2. Der Editor bereitet das Intro-Image im RAM vor: ROM-Font nach `$2000`, Default-Config, leerer Text, Katalog von Disk.
-3. Vorschau: `rt_preview=1`, `JSR runtime_start`, Space → Rückkehr in den Editor.
-4. Speichern: Operand von `$0810` auf `runtime_start` patchen, `$0801`…Textende+1 speichern, Operand zurückpatchen.
-5. Gespeichertes Intro: `LOAD"NAME",8` + `RUN` → `SYS 2064` → `JMP runtime_start`. Space → Reset.
-
----
-
-## 4. Speicherbelegung (Bank 0)
-
-```
-$0002-$001F  ZP Runtime
-$0020-$003F  ZP Editor                (KERNAL-ZP $90-$FF unangetastet)
-$0400-$07E7  Screen (Runtime + Editor)
-$07F8-$07FF  Sprite-Pointer
-$0801-$080F  BASIC-Stub "10 SYS2064" (BasicUpstart)
-$0810-$0812  JMP <entry>              (Operand wird gepatcht)
-$0813-$0FBF  Runtime Code + kleine Daten       .errorif * > $0FC0
-$0FC0-$0FFF  Sprite-Daten (Ball, per .for generiert)
-$1000-$1FFF  SID (max. 4 KB)          CPU-RAM; VIC sieht hier Char-ROM → egal
-$2000-$27FF  Font (genutzt: $2000-$21FF = Zeichen $00-$3F)
-$2800-$28FF  Config-Block
-$2900-$2BFF  Runtime-Tabellen + Bar-Puffer (page-aligned)
-$2C00-$3FFE  Scrolltext, Ende = $FF   → max. 5118 Zeichen
-$3FFF        MUSS $00 sein (VIC-Idle-Byte im FLD-Bereich, siehe 6.5)
------------------------------- Save-Ende = Textende + 1
-$4000-$5FFF  Editor Code + Daten      .errorif * > $6000
-$6000-$67FF  Katalog (von Disk geladen)
-$6800-$6FFF  Editor-Variablen/Puffer (Dateiname, Asset-Namen, Status)
-```
-
-VIC-Register:
-- Runtime: `$D018 = $18` (Screen `$0400`, Charset `$2000`), `$D011 = $1B`, `$D016 = $C8`
-- Editor: `$D018 = $14` (Screen `$0400`, ROM-Charset Großbuchstaben)
+1. `LOAD"*",8` + `RUN` → BASIC stub `SYS 2064` → `$0810: JMP editor_start`
+2. The editor prepares the intro image in RAM: ROM font to `$2000`, default config, empty text, catalog from disk.
+3. Preview: `rt_preview=1`, `JSR runtime_start`, Space → back to the editor.
+4. Save: patch the operand at `$0810` to `runtime_start`, save `$0801`…end of text+1, patch the operand back.
+5. Saved intro: `LOAD"NAME",8` + `RUN` → `SYS 2064` → `JMP runtime_start`. Space → reset.
 
 ---
 
-## 5. Config-Block (`$2800`, Teil des gespeicherten Intros)
+## 4. Memory map (bank 0)
 
-| Offset | Größe | Inhalt | Default |
+```
+$0002-$001F  ZP runtime
+$0020-$003F  ZP editor                (KERNAL ZP $90-$FF untouched)
+$0400-$07E7  screen (runtime + editor)
+$07F8-$07FF  sprite pointers
+$0801-$080F  BASIC stub "10 SYS2064" (BasicUpstart)
+$0810-$0812  JMP <entry>              (operand gets patched)
+$0813-$0FBF  runtime code + small data         .errorif * > $0FC0
+$0FC0-$0FFF  sprite data (ball, generated with .for)
+$1000-$1FFF  SID (max. 4 KB)          CPU RAM; the VIC sees char ROM here → irrelevant
+$2000-$27FF  font (used: $2000-$21FF = chars $00-$3F)
+$2800-$28FF  config block
+$2900-$2BFF  runtime tables + bar buffers (page-aligned)
+$2C00-$3FFE  scroll text, end = $FF   → max. 5118 characters
+$3FFF        MUST be $00 (VIC idle byte in the FLD area, see 6.5)
+------------------------------ save end = end of text + 1
+$4000-$5FFF  editor code + data       .errorif * > $6000
+$6000-$67FF  catalog (loaded from disk)
+$6800-$6FFF  editor variables/buffers (file name, asset names, status)
+```
+
+VIC registers:
+- Runtime: `$D018 = $18` (screen `$0400`, charset `$2000`), `$D011 = $1B`, `$D016 = $C8`
+- Editor: `$D018 = $14` (screen `$0400`, ROM charset upper case)
+
+---
+
+## 5. Config block (`$2800`, part of the saved intro)
+
+| Offset | Size | Content | Default |
 |---|---|---|---|
-| +$00 | 2 | Magic `"IM"` | |
-| +$02 | 1 | Version = 1 | |
-| +$03 | 1 | Flags: bit0 MUSIC, bit1 BARS, bit2 BAR_SINE, bit3 SPRITES, bit4 TITLE_CYCLE | BARS+BAR_SINE+TITLE_CYCLE |
-| +$04 | 1 | Rahmenfarbe | 0 |
-| +$05 | 1 | Hintergrundfarbe | 0 |
-| +$06 | 1 | Scrollerfarbe | 1 |
-| +$07 | 1 | Titelfarbe (wenn kein Zyklus) | 7 |
-| +$08 | 1 | Bar-Preset 0–7 | 0 |
-| +$09 | 1 | Start-Scrollspeed 1/2/4 | 2 |
+| +$00 | 2 | magic `"IM"` | |
+| +$02 | 1 | version = 1 | |
+| +$03 | 1 | flags: bit0 MUSIC, bit1 BARS, bit2 BAR_SINE, bit3 SPRITES, bit4 TITLE_CYCLE | BARS+BAR_SINE+TITLE_CYCLE |
+| +$04 | 1 | border colour | 0 |
+| +$05 | 1 | background colour | 0 |
+| +$06 | 1 | scroller colour | 1 |
+| +$07 | 1 | title colour (without cycle) | 7 |
+| +$08 | 1 | bar preset 0–7 | 0 |
+| +$09 | 1 | initial scroll speed 1/2/4 | 2 |
 | +$0A | 2 | SID init | $1000 |
 | +$0C | 2 | SID play | $1003 |
-| +$0E | 1 | Subtune (0-basiert) | 0 |
-| +$10 | 80 | Titel, 2×40 Screencodes | Leerzeichen |
+| +$0E | 1 | subtune (0-based) | 0 |
+| +$10 | 80 | title, 2×40 screen codes | spaces |
 
-Die Runtime liest **nur** diesen Block, den Font, den SID und den Text. Die Vorschau nutzt denselben Block. Was man sieht, wird also auch gespeichert.
+The runtime reads **only** this block, the font, the SID and the text. The preview uses the same block. So what you see is what gets saved.
 
 ---
 
 ## 6. Runtime
 
 ### 6.1 Init (`runtime_start`)
-`SEI` → `$01=$35` → CIA-IRQs aus (`$DC0D/$DD0D = $7F`, beide lesen) → Raster-IRQ an (`$D01A=1`) → Vektoren `$FFFE` (IRQ) und `$FFFA` (NMI → `RTI`) → Screen löschen (`$0400-$07E7`), Titel nach Zeilen 1–2, Farben setzen → Sprites nach Flag → SID init (wenn MUSIC: `LDA subtune`, `JSR init` über gepatchten Operand) → `$D019` acken → `CLI`.
+`SEI` → `$01=$35` → CIA IRQs off (`$DC0D/$DD0D = $7F`, read both) → raster IRQ on (`$D01A=1`) → vectors `$FFFE` (IRQ) and `$FFFA` (NMI → `RTI`) → clear screen (`$0400-$07E7`), title into rows 1–2, set colours → sprites according to flag → SID init (if MUSIC: `LDA subtune`, `JSR init` via patched operand) → ack `$D019` → `CLI`.
 
-IRQ-Handler sichern A/X/Y selbst, weil kein KERNAL aktiv ist.
+IRQ handlers save A/X/Y themselves because no KERNAL is active.
 
-### 6.2 Screen-Layout und Rasterzeilen (YSCROLL = 3)
+### 6.2 Screen layout and raster lines (YSCROLL = 3)
 
-| Bereich | Screenzeile | Rasterzeilen |
+| Area | Screen row | Raster lines |
 |---|---|---|
-| Titel | 1–2 | 59–74 |
-| Sprite-Zone | 3–9 (leer) | 75–130 |
-| FLD-Lücke mit Bars | – | 131–210 (80 Zeilen) |
-| leer | 10–12 | 211–234 |
-| **Scroller** | **13** (`$0608`, Farbe `$DA08`) | 235–242 |
+| title | 1–2 | 59–74 |
+| sprite zone | 3–9 (empty) | 75–130 |
+| FLD gap with bars | – | 131–210 (80 lines) |
+| empty | 10–12 | 211–234 |
+| **scroller** | **13** (`$0608`, colour `$DA08`) | 235–242 |
 
-Durch das FLD wird Screenzeile 10 erst bei Rasterzeile 211 dargestellt. Der Scroller steht deshalb in **Screenzeile 13**.
+Because of the FLD, screen row 10 is only displayed at raster line 211. That is why the scroller is in **screen row 13**.
 
-### 6.3 IRQ-Kette
+### 6.3 IRQ chain
 
-| IRQ | Zeile | Aufgaben |
+| IRQ | Line | Tasks |
 |---|---|---|
-| TOP | $10 | `$D016=$C8`, `$D018=$18`, `$D011=$1B`; Sprite-Positionen; Titel-Farbzyklus; Bar-Puffer für diesen Frame berechnen |
-| BARS | $80 | Double-IRQ → stabil; 80 Zeilen Loop (6.5); danach `$D011=$1B`, `$D020/$D021` = Config |
-| SCROLL | $E8 | `$D016 = $C0 \| xscroll` (38-Spalten-Modus) |
-| BOTTOM | $F8 | `$D016=$C8`; SID play (wenn MUSIC); Scroller-Logik; Space-Abfrage |
+| TOP | $10 | `$D016=$C8`, `$D018=$18`, `$D011=$1B`; sprite positions; title colour cycle; compute the bar buffer for this frame |
+| BARS | $80 | double IRQ → stable; 80-line loop (6.5); afterwards `$D011=$1B`, `$D020/$D021` = config |
+| SCROLL | $E8 | `$D016 = $C0 \| xscroll` (38-column mode) |
+| BOTTOM | $F8 | `$D016=$C8`; SID play (if MUSIC); scroller logic; Space check |
 
 ### 6.4 Scroller
-- Pro Frame: `xscroll -= speed`. Bei Unterlauf `+8`, dann Zeile 13 um ein Zeichen nach links schieben und neues Zeichen in Spalte 39 schreiben.
-- Textbytes: `$00–$3F` = Screencode. `$F1/$F2/$F4` = Speed 1/2/4. `$F8` = Pause 100 Frames. `$FF` = Ende → Textanfang. Steuercodes werden sofort ausgewertet und das nächste Byte geholt.
-- Ist der Text leer (erstes Byte `$FF`), wird ein Leerzeichen ausgegeben (keine Endlosschleife).
+- Per frame: `xscroll -= speed`. On underflow `+8`, then shift row 13 one character to the left and write the new character into column 39.
+- Text bytes: `$00–$3F` = screen code. `$F1/$F2/$F4` = speed 1/2/4. `$F8` = pause 100 frames. `$FF` = end → start of text. Control codes are evaluated immediately and the next byte is fetched.
+- If the text is empty (first byte `$FF`), a space is output (no endless loop).
 
-### 6.5 Rasterbars in der FLD-Lücke
-- **FLD läuft immer**, auch wenn BARS aus ist, damit das Layout identisch bleibt. Pro Zeile YSCROLL so setzen, dass in der nächsten Zeile keine Badline-Bedingung entsteht. In Zeile 210 wieder YSCROLL=3 setzen, dann wird 211 zur Badline für Screenzeile 10.
-- Ohne Badlines und Sprites in diesem Bereich hat jede Zeile volle 63 Zyklen. Der Loop ist **exakt 63 Zyklen** pro Iteration: `lda border_buf,x / sta $d020 / lda bg_buf,x / sta $d021 / lda fld_tab,x / sta $d011` + Padding.
-- `border_buf`, `bg_buf` und `fld_tab` (je 80 Byte) liegen so, dass **keine Pagegrenze gekreuzt wird** (sonst +1 Zyklus). Mit `.errorif` prüfen.
-- Die Puffer werden in IRQ TOP gefüllt: Default Rahmen- und Hintergrundfarbe, darüber 3 Bars à 15 Zeilen aus dem gewählten Preset (Gradient setzt `$D020` und `$D021`, also volle Breite).
-- Mit BAR_SINE: Position `bar_sin[(phase + i*43) & 127]` im Bereich 0–65, `phase += 1` pro Frame. Ohne: feste Positionen 5 / 32 / 60.
-- 8 Presets à 15 Farben, symmetrische Verläufe. Beispiel Preset 0: `6,6,14,14,3,3,1,1,1,3,3,14,14,6,6`.
-- **Im FLD-Bereich zeigt der VIC im Idle-State das Byte bei `$3FFF`.** Es muss `$00` sein, sonst erscheinen Streifen. Der Editor stellt das vor Vorschau und Save sicher.
+### 6.5 Raster bars in the FLD gap
+- **FLD always runs**, even if BARS is off, so the layout stays identical. Per line set YSCROLL so that no badline condition occurs in the next line. In line 210 set YSCROLL=3 again, then 211 becomes the badline for screen row 10.
+- Without badlines and sprites in this area every line has the full 63 cycles. The loop is **exactly 63 cycles** per iteration: `lda border_buf,x / sta $d020 / lda bg_buf,x / sta $d021 / lda fld_tab,x / sta $d011` + padding.
+- `border_buf`, `bg_buf` and `fld_tab` (80 bytes each) are placed so that **no page boundary is crossed** (otherwise +1 cycle). Check with `.errorif`.
+- The buffers are filled in IRQ TOP: default border and background colour, on top 3 bars of 15 lines each from the selected preset (the gradient sets `$D020` and `$D021`, i.e. full width).
+- With BAR_SINE: position `bar_sin[(phase + i*43) & 127]` in the range 0–65, `phase += 1` per frame. Without: fixed positions 5 / 32 / 60.
+- 8 presets of 15 colours, symmetric gradients. Example preset 0: `6,6,14,14,3,3,1,1,1,3,3,14,14,6,6`.
+- **In the FLD area the VIC shows the byte at `$3FFF` in idle state.** It must be `$00`, otherwise stripes appear. The editor ensures this before preview and save.
 
-### 6.6 Sprite-Sinus
-- 8 Hires-Sprites, Ball 21×21 bei `$0FC0` (Pointer `$3F`), Farben aus einer 8er-Tabelle.
-- X aus 128er-Tabellen `spr_xlo`/`spr_xhi` (Bereich 24–320, MSB → `$D010`). Y aus `spr_y` (Bereich **76–104**, damit Sprites vor Zeile 127 enden und nicht mit dem Double-IRQ bzw. den Bars kollidieren).
-- Phasenversatz 16 pro Sprite, X-Phase +2 und Y-Phase +3 pro Frame.
+### 6.6 Sprite sine
+- 8 hires sprites, ball 21×21 at `$0FC0` (pointer `$3F`), colours from an 8-entry table.
+- X from 128-entry tables `spr_xlo`/`spr_xhi` (range 24–320, MSB → `$D010`). Y from `spr_y` (range **76–104**, so the sprites end before line 127 and do not collide with the double IRQ or the bars).
+- Phase offset 16 per sprite, X phase +2 and Y phase +3 per frame.
 
-### 6.7 Titel-Farbzyklus
-16er-Farbtabelle, alle 2 Frames `phase+1`. Farb-RAM der Zeilen 1–2 = `cyc[(spalte + phase) & 15]`. Ohne Flag erhalten beide Zeilen die Titelfarbe.
+### 6.7 Title colour cycle
+16-entry colour table, every 2 frames `phase+1`. Colour RAM of rows 1–2 = `cyc[(column + phase) & 15]`. Without the flag both rows get the title colour.
 
-### 6.8 Beenden
-- IRQ BOTTOM prüft Space direkt über CIA1 (`$DC00=$7F`, `$DC01` bit 4 = 0) und setzt `exit_req`.
-- Die Hauptschleife in `runtime_start` wartet auf `exit_req`:
-  - `rt_preview = 0`: `$01=$37`, `JMP $FCE2` (Reset).
-  - `rt_preview = 1`: warten bis Space losgelassen, dann **Restore** (`SEI`, `$D01A=0`, `$D019` acken, `$DC0D=$81`, `$D418=0`, `$D015=0`, `$D016=$C8`, `$D011=$1B`, `$01=$37`), Tastaturpuffer leeren (`$C6=0`), `RTS`.
-- `rt_preview` ist ein Byte im Runtime-Segment. Vor jedem Save wird es auf 0 gesetzt.
+### 6.8 Exit
+- IRQ BOTTOM checks Space directly via CIA1 (`$DC00=$7F`, `$DC01` bit 4 = 0) and sets `exit_req`.
+- The main loop in `runtime_start` waits for `exit_req`:
+  - `rt_preview = 0`: `$01=$37`, `JMP $FCE2` (reset).
+  - `rt_preview = 1`: wait until Space is released, then **restore** (`SEI`, `$D01A=0`, ack `$D019`, `$DC0D=$81`, `$D418=0`, `$D015=0`, `$D016=$C8`, `$D011=$1B`, `$01=$37`), clear the keyboard buffer (`$C6=0`), `RTS`.
+- `rt_preview` is a byte in the runtime segment. It is set to 0 before every save.
 
 ---
 
 ## 7. Editor
 
 ### 7.1 Start
-Laufwerk = `$BA` (bei < 8 → 8). ROM-Font nach `$2000` kopieren (`SEI`, `$01=$33`, 512 Bytes ab `$D000`, zurück auf `$37`). Config-Defaults schreiben, Text = `$FF`, `$3FFF=0`. Editor-IRQ installieren. Katalog `catalog` nach `$6000` laden; bei Fehler 0 Einträge und Hinweis `KATALOG FEHLT`.
+Drive = `$BA` (if < 8 → 8). Copy the ROM font to `$2000` (`SEI`, `$01=$33`, 512 bytes from `$D000`, back to `$37`). Write config defaults, text = `$FF`, `$3FFF=0`. Install the editor IRQ. Load the catalog `catalog` to `$6000`; on error 0 entries and the message `CATALOG MISSING`.
 
-### 7.2 Editor-IRQ
-CIA1-IRQ aus, **Raster-IRQ** 1× pro Frame (50 Hz, damit die Musik im richtigen Tempo läuft), Vektor `$0314`. Der Handler ackt `$D019`, ruft `play` auf, wenn `music_on` gesetzt ist, und springt dann nach `$EA31` (KERNAL-Tastaturabfrage). Vor jedem LOAD in den SID-Bereich `music_on=0` und `$D418=0` setzen.
+### 7.2 Editor IRQ
+CIA1 IRQ off, **raster IRQ** once per frame (50 Hz, so the music plays at the correct tempo), vector `$0314`. The handler acks `$D019`, calls `play` if `music_on` is set, and then jumps to `$EA31` (KERNAL keyboard scan). Before every LOAD into the SID area set `music_on=0` and `$D418=0`.
 
-### 7.3 Ausgabe
-Eigene Print-Routinen schreiben Screencodes direkt nach `$0400` und in den Farb-RAM. Kein `CHROUT`.
+### 7.3 Output
+Own print routines write screen codes directly to `$0400` and into colour RAM. No `CHROUT`.
 
-### 7.4 Hauptmenü (Tasten 1–8)
+### 7.4 Main menu (keys 1–8)
 ```
 C64 INTRO MAKER
-1 MUSIK:  <name>
+1 MUSIC:  <name>
 2 FONT:   <name>
-3 FARBEN
-4 EFFEKTE
-5 TITEL
+3 COLORS
+4 EFFECTS
+5 TITLE
 6 SCROLLTEXT (<n>/5118)
-7 VORSCHAU
-8 SPEICHERN
+7 PREVIEW
+8 SAVE
 ```
-Unten bleibt eine Statuszeile frei (Zeile 24) für Meldungen und Laufwerksstatus.
+A status line stays free at the bottom (row 24) for messages and the drive status.
 
-### 7.5 Listen (Musik, Font)
-Max. 16 Einträge in den Zeilen 4–19, Markierung durch reverse Zeile. CRSR hoch/runter wählt, RETURN übernimmt, RUN/STOP geht zurück.
-- Musik: Der erste Eintrag ist `KEINE MUSIK` (MUSIC-Flag aus), danach folgen die Katalog-SIDs. Bei Auswahl: Musik stoppen, laden, init/play/subtune in die Config übernehmen, MUSIC-Flag setzen, init aufrufen, Musik an.
-- Font: `ROM` und `ROM FETT` (Byte `b | (b >> 1)`) sind eingebaut, danach folgen die Katalog-Fonts (512 Bytes nach `$2000`).
+### 7.5 Lists (music, font)
+Max. 16 entries in rows 4–19, selection shown as a reversed row. CRSR up/down selects, RETURN accepts, RUN/STOP goes back.
+- Music: the first entry is `NO MUSIC` (MUSIC flag off), followed by the catalog SIDs. On selection: stop music, load, copy init/play/subtune into the config, set the MUSIC flag, call init, music on.
+- Font: `ROM` and `ROM BOLD` (byte `b | (b >> 1)`) are built in, followed by the catalog fonts (512 bytes to `$2000`).
 
-### 7.6 Farben
-Tasten 1–4 schalten Rand, Hintergrund, Scroller und Titel jeweils +1 (mod 16). Neben jedem Label steht ein Farbblock (reverses Leerzeichen).
+### 7.6 Colours
+Keys 1–4 step border, background, scroller and title by +1 (mod 16). Next to each label there is a colour block (reversed space).
 
-### 7.7 Effekte
-1 Rasterbars an/aus · 2 Bar-Sinus an/aus · 3 Bar-Farben (Preset 1–8) · 4 Sprites an/aus · 5 Titel-Farbzyklus an/aus · 6 Scroll-Speed 1/2/4
+### 7.7 Effects
+1 raster bars on/off · 2 bar sine on/off · 3 bar colours (preset 1–8) · 4 sprites on/off · 5 title colour cycle on/off · 6 scroll speed 1/2/4
 
-### 7.8 Titel-Editor
-Überschreibmodus, 80 Zeichen in 2 Zeilen, Cursor-Tasten, RUN/STOP zurück.
+### 7.8 Title editor
+Overwrite mode, 80 characters in 2 rows, cursor keys, RUN/STOP back.
 
-### 7.9 Scrolltext-Editor
-- Einfügemodus, Anzeige in den Zeilen 3–20 (720 Zeichen). Das Fenster scrollt zeilenweise mit, damit der Cursor sichtbar bleibt.
-- Eingabe über `GETIN` (`$FFE4`). Es werden nur PETSCII `$20–$5F` akzeptiert: `$20–$3F` bleibt gleich, `$40–$5F` wird zu `-$40` → Screencodes `$00–$3F`.
-- F1/F3/F5 fügen Speed 1/2/4 ein (`$F1/$F2/$F4`), F7 fügt eine Pause ein (`$F8`). Anzeige als reverse `1`/`2`/`4`/`P`.
-- CRSR ←/→/↑/↓ (±1 / ±40), DEL löscht links vom Cursor, HOME springt an den Anfang, RUN/STOP geht zurück.
-- Beim Maximum (5118) werden Eingaben ignoriert und der Rahmen blitzt kurz.
-- Die Statuszeile zeigt `ZEICHEN n/5118  F1 F3 F5 SPEED  F7 PAUSE  STOP ZURUECK`.
+### 7.9 Scroll text editor
+- Insert mode, shown in rows 3–20 (720 characters). The window scrolls line by line so the cursor stays visible.
+- Input via `GETIN` (`$FFE4`). Only PETSCII `$20–$5F` is accepted: `$20–$3F` stays, `$40–$5F` becomes `-$40` → screen codes `$00–$3F`.
+- F1/F3/F5 insert speed 1/2/4 (`$F1/$F2/$F4`), F7 inserts a pause (`$F8`). Shown as reversed `1`/`2`/`4`/`P`.
+- CRSR ←/→/↑/↓ (±1 / ±40), DEL deletes left of the cursor, HOME jumps to the start, RUN/STOP goes back.
+- At the maximum (5118) input is ignored and the border flashes briefly.
+- The status line shows `CHARS n/5118  F1 F3 F5 SPEED  F7 PAUSE  STOP BACK`.
 
-### 7.10 Vorschau
-`$3FFF=0` sicherstellen, Text terminieren, `rt_preview=1`, `JSR runtime_start`. Danach Editor-IRQ neu installieren, `$D018=$14` setzen und das Menü neu zeichnen.
+### 7.10 Preview
+Ensure `$3FFF=0`, terminate the text, `rt_preview=1`, `JSR runtime_start`. Afterwards reinstall the editor IRQ, set `$D018=$14` and redraw the menu.
 
-### 7.11 Speichern
-1. Dateiname eingeben (1–16 Zeichen, PETSCII `$20–$5F`). RUN/STOP bricht ab.
-2. `rt_preview=0`, `$3FFF=0`, Text terminieren. Operand bei `$0811/$0812` auf `runtime_start` setzen.
-3. `SETNAM`, `SETLFS(1, dev, 0)`, Startzeiger `$FB/$FC = $0801`, `LDA #$FB`, X/Y = Textende+1, `JSR $FFD8`.
-4. Operand wieder auf `editor_start` setzen.
-5. Laufwerksstatus lesen (Kanal 15, bis `$0D`) und in Zeile 24 anzeigen (z. B. `00, OK`, `63, FILE EXISTS`, `72, DISK FULL`).
-6. **Kein `@0:`-Overwrite** (1541-Replace-Bug). Existiert die Datei schon, wird einfach der Status gezeigt.
+### 7.11 Save
+1. Enter a file name (1–16 characters, PETSCII `$20–$5F`). RUN/STOP cancels.
+2. `rt_preview=0`, `$3FFF=0`, terminate the text. Set the operand at `$0811/$0812` to `runtime_start`.
+3. `SETNAM`, `SETLFS(1, dev, 0)`, start pointer `$FB/$FC = $0801`, `LDA #$FB`, X/Y = end of text+1, `JSR $FFD8`.
+4. Set the operand back to `editor_start`.
+5. Read the drive status (channel 15, until `$0D`) and show it in row 24 (e.g. `00, OK`, `63, FILE EXISTS`, `72, DISK FULL`).
+6. **No `@0:` overwrite** (1541 replace bug). If the file already exists, simply show the status.
 
-### 7.12 Laden
-`SETNAM`, `SETLFS(1, dev, 1)`, `LDA #0`, `JSR $FFD5`. Ist Carry gesetzt, `LADEFEHLER` plus Laufwerksstatus anzeigen.
+### 7.12 Load
+`SETNAM`, `SETLFS(1, dev, 1)`, `LDA #0`, `JSR $FFD5`. If carry is set, show `LOAD ERROR` plus the drive status.
 
 ---
 
-## 8. Assets, Manifest, Katalog
+## 8. Assets, manifest, catalog
 
 ### 8.1 `assets/manifest.toml`
 ```toml
 [[sid]]
-name    = "TESTMELODIE"        # max. 20 Zeichen: A-Z 0-9 Leerzeichen . , ! ? - : / ( )
-file    = "tune-test"          # Diskname: a-z 0-9 -, max. 16, KLEIN geschrieben
-src     = "build/testtune.prg" # .sid (PSID) oder .prg
-init    = 0x1000               # nur bei .prg Pflicht
+name    = "TEST TUNE"          # max. 20 chars: A-Z 0-9 space . , ! ? - : / ( )
+file    = "tune-test"          # disk name: a-z 0-9 -, max. 16, LOWER case
+src     = "build/testtune.prg" # .sid (PSID) or .prg
+init    = 0x1000               # required for .prg only
 play    = 0x1003
 subtune = 0
 author  = "Jochen"
-license = "eigene Produktion"
+license = "own work"
 
 [[font]]
-name    = "BEISPIEL"
-file    = "font-beispiel"
-src     = "assets/fonts/beispiel.64c"   # .64c (2 Byte Ladeadr. + Daten) oder .bin
+name    = "EXAMPLE"
+file    = "font-example"
+src     = "assets/fonts/example.64c"    # .64c (2 byte load address + data) or .bin
 author  = "…"
-license = "…"                           # Pflichtfeld, sonst Build-Abbruch
+license = "…"                           # required, otherwise the build aborts
 ```
 
-### 8.2 `tools/build_disk.py` (Validierung → Abbruch mit klarer Meldung)
-- **SID (.sid)**: PSID-Header big-endian parsen (magic, dataOffset, load, init, play, songs, startSong, speed). Load = 0 bedeutet, dass die ersten 2 Datenbytes die Ladeadresse sind (little-endian). Init = 0 bedeutet init = load.
-  - Abgelehnt werden: `RSID`, play = 0, Speed-Bit gesetzt (CIA-Timing), Daten außerhalb `$1000–$1FFF`, init oder play außerhalb der Daten.
-  - Nicht auf `$1000` gelinkte Tunes werden mit dem Hinweis auf `sidreloc` abgelehnt. Das Tool selbst relocatet nicht.
-  - Subtune-Default = startSong − 1.
-- **SID (.prg)**: Ladeadresse aus den ersten 2 Bytes, init/play aus dem Manifest, gleiche Bereichsprüfung.
-- **Font**: Ladeadresse von `.64c` entfernen, die ersten 512 Bytes verwenden (weniger ist ein Fehler), als PRG mit Ladeadresse `$2000` ausgeben.
-- Max. 15 SIDs und 15 Fonts.
-- **Namen**: in Großbuchstaben → Screencodes (`A–Z` → 1–26, `$20–$3F` bleibt gleich, `@` → 0), mit Leerzeichen auf 20 aufgefüllt.
-- **Dateinamen**: Im Katalog stehen die Bytes von `file.upper()` (PETSCII `$41–$5A`). An `c1541` wird der Name **klein** übergeben, dann schreibt c1541 genau diese Bytes. Wer das verwechselt, bekommt geshiftete Zeichen und LOAD findet nichts.
-- **Katalog** `build/catalog.prg`, Ladeadresse `$6000`:
+### 8.2 `tools/build_disk.py` (validation → abort with a clear message)
+- **SID (.sid)**: parse the PSID header big-endian (magic, dataOffset, load, init, play, songs, startSong, speed). Load = 0 means the first 2 data bytes are the load address (little-endian). Init = 0 means init = load.
+  - Rejected: `RSID`, play = 0, speed bit set (CIA timing), data outside `$1000–$1FFF`, init or play outside the data.
+  - Tunes not linked to `$1000` are rejected with a hint to `sidreloc`. The tool itself does not relocate.
+  - Subtune default = startSong − 1.
+- **SID (.prg)**: load address from the first 2 bytes, init/play from the manifest, same range check.
+- **Font**: strip the load address from `.64c`, use the first 512 bytes (fewer is an error), output as PRG with load address `$2000`.
+- Max. 15 SIDs and 15 fonts.
+- **Names**: upper case → screen codes (`A–Z` → 1–26, `$20–$3F` unchanged, `@` → 0), padded with spaces to 20.
+- **File names**: the catalog holds the bytes of `file.upper()` (PETSCII `$41–$5A`). `c1541` gets the name in **lower case**, then c1541 writes exactly these bytes. Mixing this up gives shifted characters and LOAD finds nothing.
+- **Catalog** `build/catalog.prg`, load address `$6000`:
   ```
   +0  n_sids   +1  n_fonts
-  +2  n_sids × 48 Byte, dann n_fonts × 48 Byte
-  Record: +0 name[20] Screencodes | +20 fnlen | +21 filename[16] PETSCII
+  +2  n_sids × 48 bytes, then n_fonts × 48 bytes
+  Record: +0 name[20] screen codes | +20 fnlen | +21 filename[16] PETSCII
           +37 init lo/hi | +39 play lo/hi | +41 subtune | +42..47 = 0
   ```
-- **Disk** über `subprocess` mit `c1541`: `-format "intro maker,im" d64 build/intromaker.d64`, dann als erste Datei `intro maker` (Editor), danach `catalog` und die Assets.
-- Zusätzlich wird `build/CREDITS.txt` (Name, Autor, Lizenz) erzeugt.
-- **Unit-Tests** (`tools/test_build_disk.py`, erzeugen Testdaten selbst): PSID-Parsing inkl. load = 0, Ablehnungsfälle, Screencode-Konvertierung, Katalog-Bytelayout, Dateinamen-Casing.
+- **Disk** via `subprocess` with `c1541`: `-format "intro maker,im" d64 build/intromaker.d64`, then as the first file `intro maker` (editor), followed by `catalog` and the assets.
+- Additionally `build/CREDITS.txt` (name, author, license) is generated.
+- **Unit tests** (`tools/test_build_disk.py`, generate their own test data): PSID parsing incl. load = 0, rejection cases, screen code conversion, catalog byte layout, file name casing.
 
-### 8.3 Testmelodie
-`assets/testtune/testtune.asm`, Ladeadresse `$1000`, init `$1000`, play `$1003`. Eine kurze Arpeggio-Schleife auf Stimme 1. Eigene Arbeit, darf ins Repo.
+### 8.3 Test tune
+`assets/testtune/testtune.asm`, load address `$1000`, init `$1000`, play `$1003`. A short arpeggio loop on voice 1. Own work, may be committed.
 
 ---
 
-## 9. Build & Tests
+## 9. Build & tests
 
-| Target | Wirkung |
+| Target | Effect |
 |---|---|
 | `make` / `make disk` | testtune → editor.prg → `build_disk.py` → `build/intromaker.d64` |
-| `make fixture` | `kickass src/main.asm -define FIXTURE` → `build/fixture.prg`: Entry `jsr font_copy_rom; jmp runtime_start`, Test-Config (alle Effekte an, Musik an), Testtitel, Testtext mit allen Steuercodes, Testmelodie per `.import binary` bei `$1000` |
+| `make fixture` | `kickass src/main.asm -define FIXTURE` → `build/fixture.prg`: entry `jsr font_copy_rom; jmp runtime_start`, test config (all effects on, music on), test title, test text with all control codes, test tune via `.import binary` at `$1000` |
 | `make run` / `make run-fixture` | `x64sc -autostart …` |
 | `make test` | `python3 -m unittest discover tools` |
-| `make smoke` | Screenshots von Fixture und Editor (siehe unten) |
-| `make clean` | `build/` löschen |
+| `make smoke` | screenshots of fixture and editor (see below) |
+| `make clean` | delete `build/` |
 
-Smoke-Test (Exitcode von VICE ignorieren, `-limitcycles` beendet mit Fehlercode):
+Smoke test (ignore the VICE exit code, `-limitcycles` exits with an error code):
 ```
 x64sc -default -pal -warp -sounddev dummy -limitcycles 20000000 \
       -exitscreenshot build/fixture.png -autostartprgmode 1 -autostart build/fixture.prg
 x64sc -default -pal -warp -sounddev dummy -limitcycles 40000000 \
       -exitscreenshot build/editor.png -autostart build/intromaker.d64
 ```
-Claude Code prüft die PNGs visuell. Tastatur-Automation per `-keybuf` ist optional. Wenn sie nicht zuverlässig greift, genügt der manuelle Test.
+Claude Code checks the PNGs visually. Keyboard automation via `-keybuf` is optional. If it does not work reliably, a manual test is enough.
 
 ---
 
-## 10. Meilensteine & Abnahme
+## 10. Milestones & acceptance
 
-**M0 – Gerüst**
-Makefile, `memmap.asm`, `config.asm` mit allen `.errorif`, Testmelodie, `build_disk.py` + Tests, D64 wird gebaut.
-Abnahme: `make test` grün, `make disk` erzeugt eine D64 mit `intro maker` (vorerst Platzhalter), `catalog` und `tune-test`.
+**M0 – Skeleton**
+Makefile, `memmap.asm`, `config.asm` with all `.errorif`, test tune, `build_disk.py` + tests, the D64 gets built.
+Acceptance: `make test` green, `make disk` creates a D64 with `intro maker` (placeholder for now), `catalog` and `tune-test`.
 
-**M1 – Runtime-Basis (Fixture)**
-IRQ-Kette, Screen-Layout, Titel statisch, Scroller mit allen Steuercodes, Musik.
-Abnahme: Screenshot zeigt Titel und Scroller in Zeile 13, die Testmelodie läuft im richtigen Tempo, Pause und Speedwechsel sichtbar, Space → Reset.
+**M1 – Runtime basics (fixture)**
+IRQ chain, screen layout, static title, scroller with all control codes, music.
+Acceptance: the screenshot shows the title and the scroller in row 13, the test tune plays at the correct tempo, pause and speed changes are visible, Space → reset.
 
-**M2 – Effekte**
-Stabiler Raster, FLD + Bars mit Presets und Sinus, Sprite-Sinus, Titel-Farbzyklus.
-Abnahme: Bars ohne Flackern und mit geraden Kanten in x64sc, der Scroller bleibt in Zeile 13 ruhig, keine Streifen in der FLD-Lücke. Jede Flag-Kombination in der Fixture-Config getestet. Zyklenbudget je IRQ als Kommentar dokumentiert.
+**M2 – Effects**
+Stable raster, FLD + bars with presets and sine, sprite sine, title colour cycle.
+Acceptance: bars without flicker and with straight edges in x64sc, the scroller stays calm in row 13, no stripes in the FLD gap. Every flag combination tested in the fixture config. Cycle budget per IRQ documented as a comment.
 
-**M3 – Editor ohne Disk**
-Editor-IRQ, Hauptmenü, Farben, Effekte, Titel- und Scrolltext-Editor, Fonts ROM/ROM FETT, Vorschau hin und zurück (beliebig oft).
-Abnahme: Eingaben erscheinen in der Vorschau, nach 10× Vorschau/Zurück hängt nichts und die Tastatur funktioniert.
+**M3 – Editor without disk**
+Editor IRQ, main menu, colours, effects, title and scroll text editor, fonts ROM/ROM BOLD, preview there and back (any number of times).
+Acceptance: input shows up in the preview, after 10× preview/back nothing hangs and the keyboard works.
 
 **M4 – Disk**
-Katalog laden, Musik- und Font-Liste mit Laden, Musik im Menü, Speichern mit Laufwerksstatus.
-Abnahme: Ein gespeichertes Intro startet in einem frischen VICE per `LOAD"NAME",8` / `RUN` und ist identisch zur Vorschau. Doppelter Dateiname zeigt `63, FILE EXISTS`.
+Load the catalog, music and font list with loading, music in the menu, save with drive status.
+Acceptance: a saved intro starts in a fresh VICE via `LOAD"NAME",8` / `RUN` and is identical to the preview. A duplicate file name shows `63, FILE EXISTS`.
 
-**M5 – Feinschliff**
-Editor-PRG mit `exomizer sfx sys` packen, README (Bedienung, Asset-Manifest, Lizenzhinweis: HVSC ist ein Archiv und keine Freigabe).
-Abnahme: Das gepackte Editor-PRG startet von der D64 und verhält sich wie in M4.
+**M5 – Polish**
+Pack the editor PRG with `exomizer sfx sys`, README (usage, asset manifest, license note: HVSC is an archive, not a permission).
+Acceptance: the packed editor PRG starts from the D64 and behaves as in M4.
 
 ---
 
-## 11. Bekannte Fallstricke (Checkliste)
+## 11. Known pitfalls (checklist)
 
-- `$3FFF ≠ 0` → Streifen in der FLD-Lücke.
-- Pagegrenze in den Tabellen des Bar-Loops → +1 Zyklus, der Raster läuft weg.
-- Sprites unterhalb von Zeile 126 → DMA stiehlt Zyklen im Double-IRQ bzw. Bar-Loop.
-- SID laden, während `play` im IRQ läuft → Absturz. Vorher `music_on=0` setzen.
-- CIA-IRQ im Editor aktiv → Musik läuft mit 60 Hz statt 50 Hz.
-- Taste Space aus der Vorschau landet im Tastaturpuffer → `$C6=0` nach der Rückkehr.
-- Operand bei `$0810` nicht zurückgepatcht → der Editor startet nach dem Speichern die Runtime.
-- Dateinamen-Casing zwischen Katalog und c1541 (siehe 8.2).
-- `-limitcycles` beendet VICE mit Fehlercode → im Makefile ignorieren.
+- `$3FFF ≠ 0` → stripes in the FLD gap.
+- Page boundary in the tables of the bar loop → +1 cycle, the raster drifts.
+- Sprites below line 126 → DMA steals cycles in the double IRQ or the bar loop.
+- Loading a SID while `play` runs in the IRQ → crash. Set `music_on=0` first.
+- CIA IRQ active in the editor → music runs at 60 Hz instead of 50 Hz.
+- The Space key from the preview ends up in the keyboard buffer → `$C6=0` after returning.
+- Operand at `$0810` not patched back → the editor starts the runtime after saving.
+- File name casing between catalog and c1541 (see 8.2).
+- `-limitcycles` exits VICE with an error code → ignore it in the Makefile.

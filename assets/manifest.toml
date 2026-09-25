@@ -4,14 +4,14 @@
 # author and license.
 
 [[sid]]
-name    = "TESTMELODIE"        # max. 20 chars: A-Z 0-9 space . , ! ? - : / ( )
+name    = "TEST TUNE"          # max. 20 chars: A-Z 0-9 space . , ! ? - : / ( )
 file    = "tune-test"          # disk name: a-z 0-9 -, max. 16, lower case
 src     = "build/testtune.prg" # .sid (PSID) or .prg
 init    = 0x1000               # required for .prg only
 play    = 0x1003
 subtune = 0
 author  = "Joerg Halitschke"
-license = "eigene Produktion"
+license = "own work"
 
 # [[font]]
 # name    = "BEISPIEL"

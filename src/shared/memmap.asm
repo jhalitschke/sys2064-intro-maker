@@ -78,6 +78,7 @@
 .label FONT              = $2000
 .const FONT_USED_SIZE    = $0200    // chars $00-$3f
 .label FONT_END          = $2800    // exclusive
+.label CHAR_ROM          = $d000    // visible with CPU_CHARROM
 .label CONFIG            = $2800
 .label CONFIG_END        = $2900
 .label RT_TABLES         = $2900

@@ -147,3 +147,9 @@
 .errorif UI_LIST_ROW + UI_LIST_ROWS > 20, "list must fit rows 4-19"
 .errorif 1 + CAT_MAX_SIDS > UI_LIST_ROWS, "music list too long"
 .errorif 2 + CAT_MAX_FONTS > UI_LIST_ROWS, "font list too long"
+
+// ---- Stable raster timing (BARS IRQ, see runtime/irq.asm) ------------------
+.const BARS_DELAY        = 8        // stage 2 wait loop before the $d012 compare
+.const BARS_ALIGN        = 10       // 5 * n + 1 cycles: colour writes land in the h-blank
+.const BARS_NOPS         = 0        // extra 2-cycle NOPs before the bar loop
+.const BARS_PAD_LOOPS    = 5        // bar loop padding: 5 * n - 1 cycles
