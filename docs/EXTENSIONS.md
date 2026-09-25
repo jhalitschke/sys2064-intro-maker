@@ -139,8 +139,9 @@ program instead of resetting the machine.
 | `$2200-$27FF` | big font tiles (chars `$40-$FF`) |
 | `$2800-$28AF` | config block v2 (see below) |
 | `$28B0-$28FF` | runtime work area (title layout, colour cycle row) |
-| `$2900-$297F` | movement sine table (signed) |
-| `$2980-$2BFF` | runtime code segment 2 |
+| `$2900-$293F` | movement sine table (half wave) |
+| `$2940-$2FFF` | runtime code segment 2 (after the half-wave sine table) |
+| `$3000-$3FFE` | scroll text, max. 4094 characters + `$FF` (was `$2C00`, 5118) |
 | `$4000-$67FF` | editor code (was `$4000-$5FFF`) |
 | `$6800-$6FFF` | editor: catalog (was `$6000`) |
 | `$7000-$8FFF` | editor: file buffer (directory, files from disk, link chunks) |

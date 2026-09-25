@@ -6,8 +6,8 @@ from helpers import (HEADER, OUT, at_menu, make, need_display, select_entry, sta
                      status_line)
 from vice import BUILD, symbols
 
-TEXT = 0x2C00
-TEXT_MAX = 5118
+TEXT = 0x3000
+TEXT_MAX = 4094
 CONFIG = 0x2800
 
 
@@ -33,7 +33,7 @@ class EditorTests(unittest.TestCase):
         self.assertEqual(lines[2], "1 MUSIC:  NO MUSIC")
         self.assertEqual(lines[3], "2 FONT:   ROM")
         self.assertEqual(lines[7], "6 TITLE STYLE  NONE (1X1)")
-        self.assertEqual(lines[8], "7 SCROLLTEXT (0/5118)")
+        self.assertEqual(lines[8], "7 SCROLLTEXT (0/4094)")
         self.assertEqual(lines[9], "8 LINK PROGRAM")
         self.assertEqual(lines[11], "0 SAVE")
         self.assertEqual(status_line(self.v), "")          # catalog found
@@ -96,9 +96,9 @@ class EditorTests(unittest.TestCase):
         self.assertEqual(v.peek16(self.sym["ed_cur"]), 3)
         # control codes are shown reversed: Z 1 P
         self.assertEqual(v.peek(0x0400 + 3 * 40, 3), [26, 0xB1, 0x90])
-        self.assertEqual(v.screen_text(25)[24], "CHARS 9/5118")
+        self.assertEqual(v.screen_text(25)[24], "CHARS 9/4094")
         self.back_to_menu()
-        self.assertEqual(v.screen_text(9)[8], "7 SCROLLTEXT (9/5118)")
+        self.assertEqual(v.screen_text(9)[8], "7 SCROLLTEXT (9/4094)")
 
     def test_06_scrolltext_window_and_limit(self):
         v = self.v
@@ -106,12 +106,14 @@ class EditorTests(unittest.TestCase):
         v.poke(TEXT, *([(i % 26) + 1 for i in range(n)] + [0xFF]))
         v.poke(self.sym["ed_text_len"], n & 0xFF, n >> 8)
         v.key("7")
-        for _ in range(20):
-            v.key("Down", hold=0.05, after=0.1)
+        for _ in range(40):                 # 20 x CRSR down (keys can get lost)
+            if v.peek16(self.sym["ed_cur"]) >= 800:
+                break
+            v.key("Down", hold=0.06, after=0.1)
         cur, win = v.peek16(self.sym["ed_cur"]), v.peek16(self.sym["ed_win"])
         self.assertEqual(cur, 800)
         self.assertTrue(win <= cur < win + 720 and win % 40 == 0)
-        v.type("Q")                         # accepted: 5118
+        v.type("Q")                         # accepted: 4094
         v.type("R")                         # rejected, border flashes
         self.assertEqual(v.peek16(self.sym["ed_text_len"]), TEXT_MAX)
         self.assertEqual(v.peek(TEXT + TEXT_MAX, 2), [0xFF, 0x00])   # $3fff stays 0
@@ -179,8 +181,8 @@ class EditorTests(unittest.TestCase):
         # preview: "HELLO" in 2x2 tiles, moving up and down
         v.key("9")
         time.sleep(1.5)
-        screen = v.peek(0x0400, 9 * 40)
-        tiles = [c for c in screen if c >= 0x40 and c != 0xA0]
+        image = v.peek(0xE280, 9 * 40)      # TITLE_IMG (static; the screen moves)
+        tiles = [c for c in image if c >= 0x40]
         self.assertEqual(len(tiles), 6 * 4, "HELLO + X (line 2, test_04) = 6 glyphs x 4 tiles")
         ys = set()
         for _ in range(8):

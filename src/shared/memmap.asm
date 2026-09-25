@@ -125,11 +125,11 @@
 .errorif rt_frame < rt_cyc_ext + CYC_EXT_LEN, "runtime work area overlap"
 .errorif RT_WORK_END > CONFIG_END, "runtime work area overflow"
 .label RT_TABLES         = $2900
-.label RT_TABLES_END     = $2c00
-.label TEXT              = $2c00
+.label RT_TABLES_END     = $3000
+.label TEXT              = $3000    // 4 KB: text, end mark, idle byte
 .label VIC_IDLE_BYTE     = $3fff    // must be $00 (FLD gap shows it)
 .label TEXT_END          = VIC_IDLE_BYTE // exclusive, incl. $ff terminator
-.const TEXT_MAX          = TEXT_END - TEXT - 1  // 5118 characters
+.const TEXT_MAX          = TEXT_END - TEXT - 1  // 4094 characters
 .label EDITOR_CODE       = $4000
 .label EDITOR_END        = $6800
 .label CATALOG           = $6800
@@ -148,7 +148,7 @@
 
 .errorif DIR_NAMES < FILE_BUF_END, "directory table overlaps the file buffer"
 
-.errorif TEXT_MAX != 5118, "text size must be 5118"
+.errorif TEXT_MAX != 4094, "text size must be 4094"
 .errorif SPRITE_DATA + 64 > SID_START, "sprite data overlaps SID"
 .errorif CONFIG < FONT + FONT_USED_SIZE, "config overlaps font"
 .errorif (RT_TABLES & $ff) != 0, "runtime tables must be page aligned"

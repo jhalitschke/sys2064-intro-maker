@@ -423,7 +423,7 @@ es_put:
         lda ed_num
         ora ed_num + 1
         bne es_cell
-        // status: CHARS n/5118
+        // status: CHARS n/4094
         Goto(0, UI_STATUS_ROW, UI_COL_STATUS)
         lda #<str_chars
         ldy #>str_chars
@@ -525,4 +525,4 @@ str_hint_title:   Str("CRSR MOVE  DEL  HOME  STOP BACK")
 str_scrolltext:   Str("SCROLLTEXT")
 str_hint_text:    Str("F1 F3 F5 SPEED  F7 PAUSE  STOP BACK")
 str_chars:        Str("CHARS ")
-str_max_len_sp:   Str("/5118  ")
+str_max_len_sp:   Str("/" + toIntString(TEXT_MAX) + "  ")

@@ -27,7 +27,7 @@ in RAM (`$0801` up to the end of the scroll text), so "save" is one KERNAL
   (1–4 × 1–4 characters per glyph, hires or multicolour, built-in smoothed
   ROM 2X2) – static or moving: **swing**, **sine**, horizontal **eight**,
   **bumper**, with 4 speeds.
-- **Scroll text**: up to 5118 characters with inline speed changes and pauses.
+- **Scroll text**: up to 4094 characters with inline speed changes and pauses.
 - **Preview** as often as you like, then **save** – the saved file starts
   with `LOAD"NAME",8` and `RUN`; SPACE resets the machine, or starts a
   **linked program**: the intro can be put in front of any PRG from disk

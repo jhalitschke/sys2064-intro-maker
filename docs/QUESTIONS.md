@@ -16,9 +16,9 @@ handled for now.
 4. **Reset path.** Before `JMP $FCE2` the runtime additionally disables the
    raster IRQ, sprites and SID volume (with `SEI`), so no IRQ can hit the
    switched-in KERNAL between `$01=$37` and the reset code.
-5. **Scroll text status line.** `CHARS n/5118  F1 F3 F5 SPEED  F7 PAUSE  STOP BACK`
+5. **Scroll text status line.** `CHARS n/4094  F1 F3 F5 SPEED  F7 PAUSE  STOP BACK`
    has more than 40 characters. The editor shows the key hints in row 23 and
-   `CHARS n/5118` in the status row 24.
+   `CHARS n/4094` in the status row 24.
 6. **DEL in the title editor.** The spec only says "overwrite mode". DEL moves
    the cursor left and blanks that character.
 7. **Headless tests.** `make smoke` and `make e2e` always use `xvfb-run`,

@@ -9,7 +9,7 @@ from helpers import (OUT, at_menu, build_test_disk, cleanup, dir_index, linked_p
                      wait_menu)
 from vice import BUILD, Vice, symbols
 
-CONFIG, FONT, TEXT = 0x2800, 0x2000, 0x2C00
+CONFIG, FONT, TEXT = 0x2800, 0x2000, 0x3000
 TUNE_TICK = 0x10C6                 # test tune frame counters
 
 

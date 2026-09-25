@@ -33,7 +33,6 @@ stub_end:
 #import "runtime/colorcycle.asm"
 #import "runtime/ramtables.asm"
 #import "runtime/titleinit.asm"
-#import "runtime/starplot.asm"
 #import "runtime/tables.asm"
 .errorif * > RT_CODE_END, "runtime code overflow, ends at $" + toHexString(*)
 
@@ -47,6 +46,7 @@ stub_end:
 #import "runtime/title.asm"
 #import "runtime/linkstart.asm"
 #import "runtime/stars.asm"
+#import "runtime/starplot.asm"
 .errorif * > RT_CODE2_END, "runtime code 2 overflow, ends at $" + toHexString(*)
 
 #if FIXTURE

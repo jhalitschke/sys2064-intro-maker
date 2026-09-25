@@ -275,7 +275,7 @@
 .const UI_FNAME_ROW      = 10
 .const UI_FNAME_COL      = 6
 .const UI_FLASH_JIFFIES  = 5
-.const UI_TEXTLEN_COL    = 13       // "(n/5118)" behind "6 SCROLLTEXT"
+.const UI_TEXTLEN_COL    = 13       // "(n/4094)" behind "7 SCROLLTEXT"
 .const UI_BLOCK_COL      = 16       // colour blocks / effect values
 .const SC_PAREN_OPEN     = $28
 .const MIN_DRIVE         = 8

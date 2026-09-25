@@ -74,7 +74,7 @@ class ConflictTests(unittest.TestCase):
 
     def test_scroll_text_write(self):
         rep = report(bytes([0x8D, 0x00, 0x30, 0x60]), play_off=3)
-        self.assertIn("scroll text $2c00-$3fff", rep.writes)
+        self.assertIn("scroll text $3000-$3fff", rep.writes)
 
     def test_runtime_code_write(self):
         rep = report(bytes([0x8D, 0x00, 0x09, 0x60]), play_off=3)
@@ -152,7 +152,7 @@ class ReferenceTests(unittest.TestCase):
 
     def test_read_modify_write_counts_as_a_write(self):
         rep = report(bytes([0xEE, 0x24, 0x39, 0x60]), play_off=3)  # INC $3924
-        self.assertIn("scroll text $2c00-$3fff", rep.writes)
+        self.assertIn("scroll text $3000-$3fff", rep.writes)
         self.assertEqual(rep.reads, [])
 
 
