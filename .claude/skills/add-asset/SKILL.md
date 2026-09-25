@@ -14,15 +14,24 @@ description: Add a SID tune or a font to the C64 Intro Maker disk via assets/man
    - `src`: path relative to the repo root
    - `license` is required, `author` recommended
    - `.prg` tunes need `init` and `play`; PSIDs take them from the header
-3. `make` – `build_disk.py` validates and aborts with a message. Common
+3. `python3 tools/check_sid.py <file>` – the header checks of
+   `build_disk.py` only see load address, size and speed bit. This traces the
+   player from init and play and reports writes, reads and JMP/JSR targets
+   that leave `$1000-$1FFF`: runtime zero page, font, runtime tables, scroll
+   text, VIC or CIA. A tune that passes the build but fails here corrupts the
+   intro at run time. Reads and jumps matter after a sidreloc run, which
+   leaves behind the references it cannot prove are addresses.
+   Static analysis - a clean result is strong evidence, not a proof, and a
+   low reported code coverage makes it worth little. Listen in the editor.
+4. `make` – `build_disk.py` validates and aborts with a message. Common
    rejections and fixes:
    - linked elsewhere than `$1000` → relocate with sidreloc
    - RSID, `play = 0`, speed bit set (CIA timing) → not supported
      (frame-based players called once per PAL frame only)
    - data beyond `$1FFF` → the tune is larger than 4 KB
    - font shorter than 512 bytes (`.64c` without its 2-byte load address)
-4. Limits: 15 tunes, 14 fonts (list rows, see `docs/QUESTIONS.md`).
-5. Check `build/CREDITS.txt` and, for music, listen in the editor
+5. Limits: 15 tunes, 14 fonts (list rows, see `docs/QUESTIONS.md`).
+6. Check `build/CREDITS.txt` and, for music, listen in the editor
    (`make run`, key `1`).
 
 File name casing: the catalog stores `file.upper()` (PETSCII `$41-$5A`),
